@@ -3,16 +3,11 @@ spring:
         name: Meme-Website
     data:
         redis:
-            # host: redis-cli -u redis://default:9PN6MFoAcyDv7Nigh5MkrKLmTNfMQUB1@redis-18758.c264.ap-south-1-1.ec2.redns.redis-cloud.com:18758
-            # port: 18758
             host: redis-18758.c264.ap-south-1-1.ec2.redns.redis-cloud.com
             port: 18758
             password: 9PN6MFoAcyDv7Nigh5MkrKLmTNfMQUB1
-            # ssl:
-            #     enabled: true
         mongodb:
             uri: mongodb+srv://softwaredev1112:gMc6fdJhLD2PEKUp@meme-website.i3lry.mongodb.net/?retryWrites=true&w=majority&appName=Meme-Website
-            # uri : mongodb://localhost:27017/Meme-website
             database: Meme-Website
             auto-index-creation: true
     mail:

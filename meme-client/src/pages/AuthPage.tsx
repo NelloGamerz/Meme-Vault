@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { AuthTabs } from '../components/auth/AuthTabs';
 import { LoginForm } from '../components/auth/LoginForm';
 import { RegisterForm } from '../components/auth/RegisterForm';
+import { toast } from "react-hot-toast";
 
 export const AuthPage: React.FC = () => {
+  useEffect(() => {
+    if (localStorage.getItem("sessionExpired")) {
+      toast.error("Session Expired! Please log in again.");
+      localStorage.removeItem("sessionExpired"); // Remove flag after showing toast
+    }
+  }, []);
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   
   // Check if user is already logged in

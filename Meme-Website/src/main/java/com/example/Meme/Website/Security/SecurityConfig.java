@@ -17,6 +17,8 @@ import org.springframework.security.config.Customizer;
 
 import com.example.Meme.Website.services.UserDetailsServiceImpl;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 @Configuration
 public class SecurityConfig {
     private final UserDetailsServiceImpl userDetailsService;
@@ -28,19 +30,41 @@ public class SecurityConfig {
     @Autowired
     private JwtFilter jwtFilter;
 
+    // @Bean
+    // public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    // return http.csrf(customizer -> customizer.disable()).
+    //             authorizeHttpRequests(request -> request
+    //                     .requestMatchers("/auth/login", "/auth/register", "/auth/forgot-password" ,"/auth/reset-password").permitAll()
+    //                     .anyRequest().authenticated()).
+    //             httpBasic(Customizer.withDefaults()).
+    //             sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+    //             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+    //             .build();
+
+
+    // }
+
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    return http.csrf(customizer -> customizer.disable()).
-                authorizeHttpRequests(request -> request
-                        .requestMatchers("/auth/login", "/auth/register", "/auth/forgot-password" ,"/auth/reset-password").permitAll()
-                        .anyRequest().authenticated()).
-                httpBasic(Customizer.withDefaults()).
-                sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-                .build();
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    return http
+        .csrf(csrf -> csrf.disable())  // Disable CSRF for JWT-based authentication
+        .cors(Customizer.withDefaults())  // Enable CORS (optional)
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/auth/login", "/auth/register", "/auth/forgot-password", "/auth/reset-password").permitAll()
+            .anyRequest().authenticated()
+        )
+        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Stateless JWT
+        .exceptionHandling(ex -> ex
+            .authenticationEntryPoint((request, response, authException) -> {
+                response.setContentType("application/json");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"error\": \"Unauthorized. Please log in again.\"}");
+            })
+        )
+        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class) // Add JWT filter
+        .build();
+}
 
-
-    }
 
     @Bean
     public AuthenticationProvider authenticationProvider() {

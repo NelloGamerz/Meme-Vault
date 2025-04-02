@@ -108,7 +108,9 @@ public class AuthService {
             throw new BadCredentialsException("Invalid username or password");
         }
 
-        String token = jwtservice.generateToken(request.getUsername(), 60);
+        long expiryDuration = request.isRememberMe() ? 7 * 24 * 60 : 24 * 60; 
+
+        String token = jwtservice.generateToken(request.getUsername(), expiryDuration);
 
         log.info("Authentication successful for username: {}", request.getUsername());
         return new AuthResponse(token, user.getUsername(), user.getUserId());

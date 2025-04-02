@@ -33,7 +33,7 @@ public class JWTService {
         }
     }
 
-    public String generateToken(String username, int expiryMinutes) {
+    public String generateToken(String username, long expiryMinutes) {
         Map<String, Object> claims = new HashMap<>();
         return Jwts.builder()
                 .setClaims(claims)
