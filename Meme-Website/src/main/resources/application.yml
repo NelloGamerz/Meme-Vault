@@ -1,0 +1,56 @@
+spring:
+    application:
+        name: Meme-Website
+    data:
+        redis:
+            # host: redis-cli -u redis://default:9PN6MFoAcyDv7Nigh5MkrKLmTNfMQUB1@redis-18758.c264.ap-south-1-1.ec2.redns.redis-cloud.com:18758
+            # port: 18758
+            host: redis-18758.c264.ap-south-1-1.ec2.redns.redis-cloud.com
+            port: 18758
+            password: 9PN6MFoAcyDv7Nigh5MkrKLmTNfMQUB1
+            # ssl:
+            #     enabled: true
+        mongodb:
+            uri: mongodb+srv://softwaredev1112:gMc6fdJhLD2PEKUp@meme-website.i3lry.mongodb.net/?retryWrites=true&w=majority&appName=Meme-Website
+            # uri : mongodb://localhost:27017/Meme-website
+            database: Meme-Website
+            auto-index-creation: true
+    mail:
+        host: smtp.gmail.com
+        port: 587
+        username: softwaredev1112@gmail.com
+        password: qbvu ustb zrjy vzki
+        properties:
+            mail:
+                smtp:
+                    auth: true
+                    starttls: 
+                        enable: true
+                        requeired : true
+
+# server:
+#     port: 8080
+
+server:
+    port: 443
+    ssl:
+        # enabled: true
+        key-store: classpath:keystore.p12
+        key-store-password: karan@2003
+        key-store-type: PKCS12
+        key-alias: https_cert
+
+security:
+    secret-key: A3F1C2D49B7E8A6F5D4C3B2E1F0A9E8D7C6B5A4F3E2D1C0B9A8F7E6D5C4B3A2F1E0D9C8B7A6F5E4D3C2B1A0F9E8D7C6B5A4F3E2D1C0B9A8F7E6D5C4B3A2F1E0D9C8B7A6
+    expiration-time: 86400000
+
+cloudinary:
+    cloudname: dr50l2xae
+    api-key: 656432256477368
+    api-secret: rWm72kAQljwmXo6zMoUe5h-zVSM
+
+logging:
+    level:
+        root: INFO
+
+
