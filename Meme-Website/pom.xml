@@ -13,7 +13,7 @@
 	<artifactId>Meme-Website</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>Meme-Website</name>
-	<description>Demo project for Spring Boot</description> 
+	<description>Demo project for Spring Boot</description>
 	<url />
 	<licenses>
 		<license />
@@ -139,6 +139,12 @@
 			<groupId>com.sun.mail</groupId>
 			<artifactId>jakarta.mail</artifactId>
 			<version>2.0.1</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.github.cdimascio</groupId>
+			<artifactId>java-dotenv</artifactId>
+			<version>5.2.2</version>
 		</dependency>
 
 	</dependencies>
