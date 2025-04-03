@@ -13,7 +13,7 @@ public class CorsConfig{
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173", "http://yourfrontend.com")); // Allow frontend origins
+        configuration.setAllowedOrigins(List.of("http://localhost:5173", "https://meme-vault-blond.vercel.app/")); // Allow frontend origins
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
         configuration.setAllowCredentials(true);
