@@ -349,7 +349,7 @@ export const ProfilePage: React.FC = () => {
 
     try {
       // Wait for the follow/unfollow action to complete
-      await handleFollowToggle(loggedInUser.userId, userId, isFollowing)
+      await handleFollowToggle(userId, isFollowing)
 
       // Fetch the updated profile data to refresh the UI
       await fetchUserProfile(userId)

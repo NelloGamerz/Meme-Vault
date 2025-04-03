@@ -63,7 +63,7 @@ interface MemeStore {
   updateUserName: (userId: string, newUsername: string) => Promise<void>;
   deleteMeme: (id: string) => Promise<void>;
   handleFollowToggle: (
-    userId: string,
+    // userId: string,
     followingUser: string,
     isFollowing: boolean
   ) => Promise<void>;
@@ -587,7 +587,7 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
   },
 
   handleFollowToggle: async (
-    userId: string,
+    // userId: string,
     followingUser: string,
     isFollowing: boolean
   ) => {
