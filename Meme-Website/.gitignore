@@ -93,6 +93,7 @@ application-prod.yml
 config/
 secrets/
 logback.xml
+Dockerfile
 
 # Ignore temporary files
 *.tmp
