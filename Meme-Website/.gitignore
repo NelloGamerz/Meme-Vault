@@ -92,6 +92,7 @@ application-prod.yml
 .env
 config/
 secrets/
+logback.xml
 
 # Ignore temporary files
 *.tmp
