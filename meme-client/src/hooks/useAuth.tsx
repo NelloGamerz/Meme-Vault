@@ -23,7 +23,7 @@ interface AuthError {
   message?: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://localhost:443';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);

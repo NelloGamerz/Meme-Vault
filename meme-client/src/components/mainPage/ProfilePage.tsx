@@ -110,19 +110,7 @@ export const ProfilePage: React.FC = () => {
 
   const [isTabChanging, setIsTabChanging] = useState(false)
   const [animationDirection, setAnimationDirection] = useState<"left" | "right">("right")
-  const [previousTab, setPreviousTab] = useState<TabType>("uploaded")
-
-  // New state for edit profile
-  const [editName, setEditName] = useState("")
-  const [editProfileError, setEditProfileError] = useState<string | null>(null)
-
-  // New state for followers/following modals
-  const [isFollowersModalOpen, setIsFollowersModalOpen] = useState(false)
-  const [isFollowingModalOpen, setIsFollowingModalOpen] = useState(false)
-  const [followersLoading, setFollowersLoading] = useState(false)
-  const [followingLoading, setFollowingLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
-  const [profilePictureError, setProfilePictureError] = useState<string | null>(null)
 
   const { userId } = useParams<{ userId: string }>()
   const loggedInUser = JSON.parse(localStorage.getItem("user") || "{}")
@@ -137,6 +125,11 @@ export const ProfilePage: React.FC = () => {
   //   if (!userId || isOwnProfile) return false;
   //   return Following.some(user => user.userId === loggedInUser.userId);
   // };
+  const [editName, setEditName] = useState("")
+  const [followersLoading, setFollowersLoading] = useState(false)
+  const [isFollowersModalOpen, setIsFollowersModalOpen] = useState(false)
+  const [followingLoading, setFollowingLoading] = useState(false)
+  const [isFollowingModalOpen, setIsFollowingModalOpen] = useState(false)
 
   useEffect(() => {
     if (userId) {
@@ -173,7 +166,6 @@ export const ProfilePage: React.FC = () => {
 
     setAnimationDirection(direction)
     setIsTabChanging(true)
-    setPreviousTab(activeTab)
 
     setTimeout(() => {
       setActiveTab(tab)
@@ -327,7 +319,6 @@ export const ProfilePage: React.FC = () => {
   const resetProfilePictureUpload = () => {
     setSelectedProfilePicture(null)
     setProfilePreviewUrl(null)
-    setProfilePictureError(null)
     if (profilePictureInputRef.current) {
       profilePictureInputRef.current.value = ""
     }
@@ -340,21 +331,15 @@ export const ProfilePage: React.FC = () => {
     return "opacity-100 transform translate-x-0"
   }
 
-  const filteredFollowers = Followers.filter(
-    (follower) => follower.username.includes(searchTerm.toLowerCase()),
-  )
+  const filteredFollowers = Followers.filter((follower) => follower.username.includes(searchTerm.toLowerCase()))
 
-  const filteredFollowing = Following.filter(
-    (follow) => follow.username.includes(searchTerm.toLowerCase()),
-  )
-
+  const filteredFollowing = Following.filter((follow) => follow.username.includes(searchTerm.toLowerCase()))
 
   const navigateToProfile = (userId: string) => {
     navigate(`/profile/${userId}`)
     setIsFollowersModalOpen(false)
     setIsFollowingModalOpen(false)
   }
-
 
   const handleFollow = async () => {
     if (!userId || isOwnProfile) return
@@ -702,7 +687,6 @@ export const ProfilePage: React.FC = () => {
               <button
                 onClick={() => {
                   setIsEditProfileModalOpen(false)
-                  setEditProfileError(null)
                 }}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
               >
@@ -881,3 +865,4 @@ export const ProfilePage: React.FC = () => {
 }
 
 export default ProfilePage
+

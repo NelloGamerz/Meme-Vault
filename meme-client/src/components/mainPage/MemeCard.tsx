@@ -1,5 +1,3 @@
-"use client"
-
 import React, { useState, useRef } from "react"
 import { Heart, Bookmark, Download, MessageCircle, MoreVertical, Trash, Share, Play, Pause } from "lucide-react"
 import { cn } from "../../hooks/utils"
@@ -11,8 +9,8 @@ import DOMPurify from "dompurify"
 
 interface MemeCardProps {
   meme: Meme
-  activeOptionsId: string | null
-  onOptionsClick: (id: string | null) => void
+  activeOptionsId?: string | null
+  onOptionsClick?: (id: string | null) => void
 }
 
 export const MemeCard: React.FC<MemeCardProps> = ({ meme, activeOptionsId, onOptionsClick }) => {
@@ -20,7 +18,6 @@ export const MemeCard: React.FC<MemeCardProps> = ({ meme, activeOptionsId, onOpt
   const navigate = useNavigate()
   const location = useLocation()
   const user = JSON.parse(localStorage.getItem("user") || "{}")
-  // const isCreator = user.id === meme.userId
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
 
@@ -31,7 +28,7 @@ export const MemeCard: React.FC<MemeCardProps> = ({ meme, activeOptionsId, onOpt
   const isSaved = savedMemes.some((m) => m.id === meme.id)
   const pathSegments = location.pathname.split("/")
   const isProfilePage = pathSegments[1] === "profile"
-  const profileUserId = pathSegments[2] // Extract userId from URL
+  const profileUserId = pathSegments[2]
   const isOwnProfile = isProfilePage && profileUserId === user.userId
   const isOptionsOpen = activeOptionsId === meme.id
   const isVideo = meme.url.match(/\.(mp4|webm|ogg)$/i)
@@ -76,7 +73,7 @@ export const MemeCard: React.FC<MemeCardProps> = ({ meme, activeOptionsId, onOpt
       console.error("Error copying meme link:", error)
       toast.error("Failed to copy link")
     }
-    onOptionsClick(null)
+    (onOptionsClick ?? (() => { }))(null);
   }
 
   const handleDelete = async (e: React.MouseEvent) => {
@@ -84,7 +81,9 @@ export const MemeCard: React.FC<MemeCardProps> = ({ meme, activeOptionsId, onOpt
     if (window.confirm("Are you sure you want to delete this meme?")) {
       try {
         await deleteMeme(meme.id)
-        onOptionsClick(null)
+        if (onOptionsClick) {
+          onOptionsClick(null);
+        }
         toast.success("Meme Delete Sucessfully")
       } catch (error) {
         console.error("Failed to delete meme. Please try again." + error)
@@ -138,7 +137,7 @@ export const MemeCard: React.FC<MemeCardProps> = ({ meme, activeOptionsId, onOpt
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement
       if (!target.closest(`[data-meme-id="${meme.id}"]`)) {
-        onOptionsClick(null)
+        (onOptionsClick ?? (() => { }))(null);
       }
     }
 
@@ -211,7 +210,9 @@ export const MemeCard: React.FC<MemeCardProps> = ({ meme, activeOptionsId, onOpt
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    onOptionsClick(isOptionsOpen ? null : meme.id)
+                    if (onOptionsClick) {
+                      onOptionsClick(isOptionsOpen? null : meme.id);
+                    }
                   }}
                   className="p-1 hover:bg-gray-100 rounded-full transition-colors ml-1"
                 >
