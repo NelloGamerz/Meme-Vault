@@ -1,5 +1,4 @@
 import { useState } from 'react';
-// import { Navigate} from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -23,7 +22,9 @@ interface AuthError {
   message?: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://meme-vault.onrender.com';
+const API_URL = 
+      // import.meta.env.VITE_API_URL || 'https://meme-vault.onrender.com';
+      "http://localhost:8080"
 
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -40,9 +41,9 @@ export const useAuth = () => {
       localStorage.setItem('user', JSON.stringify(response.data));
       
       // Store user data if provided by the API
-      if (response.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-      }
+      // if (response.data.user) {
+      //   localStorage.setItem('user', JSON.stringify(response.data.user));
+      // }
       
       toast.success('Successfully logged in!');
       return response.data;
@@ -150,6 +151,7 @@ export const useAuth = () => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // localStorage.removeItem("userData")  
     toast.success('Successfully logged out!');
   };
 

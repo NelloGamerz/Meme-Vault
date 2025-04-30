@@ -42,7 +42,7 @@ export interface Meme {
 }
 
 export interface Comment {
-  id: string;
+  id?: string;
   memeId: string;
   userId: string;
   text: string;
@@ -68,7 +68,7 @@ export interface ApiMeme {
 }
 
 export interface ApiComment {
-  id: string;
+  id?: string;
   userId: string;
   memeId: string;
   text: string;

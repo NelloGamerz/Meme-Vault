@@ -37,7 +37,7 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
         .csrf(csrf -> csrf.disable())  // Disable CSRF for JWT-based authentication
         .cors(Customizer.withDefaults())  // Enable CORS (optional)
         .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/auth/login", "/auth/register", "/auth/forgot-password", "/auth/reset-password").permitAll()
+            .requestMatchers("/auth/login", "/auth/register", "/auth/forgot-password", "/auth/reset-password", "/ws/**").permitAll()
             .anyRequest().authenticated()
         )
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Stateless JWT

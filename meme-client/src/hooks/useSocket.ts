@@ -221,3 +221,33 @@
 
 //   return { sendComment };
 // }; 
+
+
+// import { Client } from '@stomp/stompjs';
+// import SockJS from 'sockjs-client';
+
+// let stompClient: Client | null = null;
+
+// export const connectWebSocket = (onConnected: () => void, onDisconnected: () => void) => {
+//   stompClient = new Client({
+//     brokerURL: import.meta.env.VITE_WS_URL || undefined, // fallback if no SockJS
+//     webSocketFactory: () => new SockJS("http://localhost:8080/ws"), // use SockJS
+//     reconnectDelay: 5000, // Try reconnect every 5 seconds
+//     debug: (str) => console.log(str),
+//     onConnect: () => {
+//       console.log('Connected to WebSocket');
+//       onConnected();
+//     },
+//     onDisconnect: () => {
+//       console.log('Disconnected from WebSocket');
+//       onDisconnected();
+//     },
+//   });
+
+//   stompClient.activate();
+// };
+
+// export const getStompClient = () => stompClient;
+// export const disconnectWebSocket = () => {
+//   stompClient?.deactivate();
+// };

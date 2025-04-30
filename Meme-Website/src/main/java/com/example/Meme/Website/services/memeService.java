@@ -1,11 +1,6 @@
 package com.example.Meme.Website.services;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -16,7 +11,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -52,6 +46,11 @@ public class memeService {
     private MongoTemplate mongoTemplate;
     @Autowired
     private RedisService redisService;
+//    @Autowired
+//    private Drive driveService;
+//
+//    @Autowired
+//    private ImageKitService imageKitService;
 
     @Transactional
     public ResponseEntity<List<Meme>> getAllMemes() {
@@ -270,6 +269,7 @@ public class memeService {
         }
     }
 
+
     @Transactional
     public ResponseEntity<?> getAllLikedMemes(String username) {
         Optional<userModel> optionalUser = userRepository.findByUsername(username);
@@ -296,29 +296,66 @@ public class memeService {
         return ResponseEntity.ok(savedMemes);
     }
 
+//    @Transactional
+//    // Comments Functionality
+//    public ResponseEntity<?> addCommentsToMeme(String memeId, String username, String Comment,
+//            String profilePictureUrl, String userId) {
+//        Optional<Meme> optionalMeme = memeRepository.findById(memeId);
+//
+//        if (optionalMeme.isEmpty()) {
+//            return ResponseEntity.status(404).body("Meme not found");
+//        }
+//
+//        Meme meme = optionalMeme.get();
+//        Comments comment = new Comments(null, userId, memeId, username, Comment, new Date(), profilePictureUrl);
+//
+//        commentRepository.save(comment);
+//
+//        if (meme.getComments() == null) {
+//            meme.setComments(new ArrayList<>());
+//        }
+//        meme.getComments().add(comment);
+//        memeRepository.save(meme);
+//
+//        return ResponseEntity.ok(comment);
+//    }
+
     @Transactional
-    // Comments Functionality
-    public ResponseEntity<?> addCommentsToMeme(String memeId, String username, String Comment,
-            String profilePictureUrl, String userId) {
-        Optional<Meme> optionalMeme = memeRepository.findById(memeId);
+    public Comments addCommentsToMeme(Comments comment) {
+        Optional<Meme> optionalMeme = memeRepository.findById(comment.getMemeId());
 
         if (optionalMeme.isEmpty()) {
-            return ResponseEntity.status(404).body("Meme not found");
+            throw new RuntimeException("Meme not found");
         }
 
+        // Save comment
+        Comments savedComment = commentRepository.save(comment);
+
+        // Update meme's comments
         Meme meme = optionalMeme.get();
-        Comments comment = new Comments(null, userId, memeId, username, Comment, new Date(), profilePictureUrl);
-
-        commentRepository.save(comment);
-
         if (meme.getComments() == null) {
             meme.setComments(new ArrayList<>());
         }
-        meme.getComments().add(comment);
-        memeRepository.save(meme);
+        meme.getComments().add(savedComment);
+        Meme updatedMeme = memeRepository.save(meme);
 
-        return ResponseEntity.ok(comment);
+        String redisKey = "AllMemes";
+        List<Meme> memeList = redisService.getList(redisKey, Meme.class);
+
+        if (memeList != null) {
+            for (int i = 0; i < memeList.size(); i++) {
+                if (memeList.get(i).getId().equals(updatedMeme.getId())) {
+                    memeList.set(i, updatedMeme); // Replace the meme with updated one
+                    break;
+                }
+            }
+            // 4. Set updated list back to Redis with TTL
+            redisService.set(redisKey, memeList, 10, TimeUnit.MINUTES);
+        }
+
+        return savedComment;
     }
+
 
     @Transactional
     public ResponseEntity<List<Comments>> getMemeComments(String memeId) {
