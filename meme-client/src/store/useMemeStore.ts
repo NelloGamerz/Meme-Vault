@@ -110,7 +110,7 @@ const setInLocalStorage = (key: string, value: unknown): void => {
 }
 
 // Get WebSocket server URL from environment or use default
-const WS_URL = "https://meme-vault.onrender.com/ws"
+const WS_URL = "wss://meme-vault.onrender.com/ws"
 
 export const useMemeStore = create<MemeStore>((set, get) => ({
   memes: [],
