@@ -23,8 +23,8 @@ interface AuthError {
 }
 
 const API_URL = 
-      // import.meta.env.VITE_API_URL || 'https://meme-vault.onrender.com';
-      "http://localhost:8080"
+      import.meta.env.VITE_API_URL || 'https://meme-vault.onrender.com';
+      // "http://localhost:8080"
 
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
