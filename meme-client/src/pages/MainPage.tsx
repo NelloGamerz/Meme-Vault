@@ -1,7 +1,7 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { LogOut, User, ImageDown, Search, Menu, X } from "lucide-react"
+import { LogOut, User, Search, Menu, X } from "lucide-react"
 import { useAuth } from "../hooks/useAuth"
 import { Button } from "../components/ui/Button"
 import { useMemeStore } from "../store/useMemeStore"
@@ -11,15 +11,15 @@ export const MainPage: React.FC = () => {
   const { logout } = useAuth()
   const navigate = useNavigate()
   const user = JSON.parse(localStorage.getItem("user") || "{}")
-  const { 
-    memes, 
-    fetchMemes, 
-    searchMemes, 
-    isLoading, 
-    error, 
-    profilePictureUrl, 
+  const {
+    memes,
+    fetchMemes,
+    searchMemes,
+    isLoading,
+    error,
+    profilePictureUrl,
     // fetchUserData,
-    fetchUserProfile 
+    fetchUserProfile
   } = useMemeStore()
   const [searchQuery, setSearchQuery] = useState("")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -74,10 +74,7 @@ export const MainPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo - always visible */}
-            <div className="flex items-center space-x-2 cursor-pointer h-full" onClick={() => navigate("/")}>
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-2 rounded-lg">
-                <ImageDown className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-              </div>
+            <div className="flex items-center cursor-pointer h-full" onClick={() => navigate("/")}>
               <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">
                 MemeVault
               </h1>
@@ -105,13 +102,13 @@ export const MainPage: React.FC = () => {
 
             {/* User controls - hidden on mobile, visible on medium screens and up */}
             <div className="hidden md:flex items-center space-x-4">
-              <button 
-                className="flex items-center space-x-2 hover:text-blue-600 transition-colors" 
+              <button
+                className="flex items-center space-x-2 hover:text-blue-600 transition-colors"
                 onClick={handleProfileNavigation}
               >
                 {profilePictureUrl ? (
-                  <img 
-                    src={profilePictureUrl} 
+                  <img
+                    src={profilePictureUrl}
                     alt="User Profile"
                     className="h-8 w-8 rounded-full border border-gray-300 object-cover"
                   />
@@ -168,8 +165,8 @@ export const MainPage: React.FC = () => {
                 }}
               >
                 {profilePictureUrl ? (
-                  <img 
-                    src={profilePictureUrl} 
+                  <img
+                    src={profilePictureUrl}
                     alt="User Profile"
                     className="h-8 w-8 rounded-full border border-gray-300 object-cover"
                   />
