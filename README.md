@@ -45,15 +45,8 @@ This creates a frictionless invite mechanism while preserving the value of signi
 
 ## 📸 Screenshots
 
-> *(Add these images to a `screenshots/` folder in your GitHub repo)*
-
-### 🔓 Shared Meme (Public View)
-![Public Meme View](screenshots/public-view.png)
-
----
-
 ### 🔒 Logged-In View
-![Logged In View](screenshots/logged-in.png)
+![Logged In View](image.png)
 
 ---
 
