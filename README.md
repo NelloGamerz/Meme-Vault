@@ -52,11 +52,28 @@ This creates a frictionless invite mechanism while preserving the value of signi
 
 ## 🧩 Architecture Overview
 
-+-------------+ +---------------+ +-------------+ | Frontend | <---> | Backend API | <---> | MongoDB | | React+Vite | | Spring Boot | | | +-------------+ +-------+-------+ +-------------+ | v +---------+ | Redis | +---------+
+```
+                     +----------------------+
+                     |     Frontend         |
+                     |  React + Vite + TS   |
+                     +----------+-----------+
+                                |
+                                v
+                     +----------------------+
+                     |     Backend API      |
+                     |   Java + Spring Boot |
+                     +----------+-----------+
+                                |
+               +-------------------------------+
+               |                               |
+               v                               v
+        +-------------+                +-------------+
+        |   MongoDB   |                |    Redis    |
+        | (Database)  |                | (Caching)   |
+        +-------------+                +-------------+
 
-
-
----
+        🔐 Secured with JWT     🐳 Deployed using Docker
+        
 
 ## ✨ Future Enhancements
 
@@ -72,7 +89,7 @@ This creates a frictionless invite mechanism while preserving the value of signi
 
 **Karan Pareek**  
 📧 softwaredev1112@gmail.com  
-🌐 [LinkedIn](www.linkedin.com/in/karan-pareek-337067270)  
+🌐 [LinkedIn](http://www.linkedin.com/in/karan-pareek-337067270)  
 
 ---
 
