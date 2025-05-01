@@ -146,8 +146,7 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
       brokerURL: `${WS_URL}?token=${token}`, // 👈 Append token here
       reconnectDelay: 5000,
       onConnect: () => {
-        console.log(`WebSocket connection established for meme ${memeId}`);
-  
+       
         stompClient?.subscribe(`/topic/meme/${memeId}`, (message) => {
           if (message.body) {
             try {
@@ -189,7 +188,6 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
         console.error("WebSocket error:", error);
       },
       onDisconnect: () => {
-        console.log(`WebSocket connection closed for meme ${memeId}`);
       },
     });
   
