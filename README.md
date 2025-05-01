@@ -1,66 +1,86 @@
 # 🤣 Meme Vault
 
-Welcome to **Meme Vault**, the ultimate meme-sharing platform where laughs are unlimited and memes are legendary! Built for meme lovers, by meme lovers. 🔥
+**Meme Vault** is the ultimate meme-sharing platform where humor meets technology. Built with a modern stack and designed for seamless user experience, Meme Vault lets you explore, share, and interact with memes—while keeping advanced features gated behind secure authentication.
 
-![Meme Vault Banner](https://your-image-url.com/banner.png) <!-- Optional: Add a banner -->
-
----
-
-## 🌟 Features
-
-- 🔐 **Authentication** – Secure login & signup to protect your meme vault.
-- 📤 **Upload Memes** – Share your funniest creations with the world.
-- ❤️ **Like & Save** – Interact with the memes you love.
-- 💬 **Commenting** – Join the conversation, one meme at a time.
-- 📎 **Sharable Links** – Send memes to friends with public view access.
-- 🔒 **Private Actions** – Like, save, comment, or browse more memes after logging in.
+> A day without a meme is a day wasted.
 
 ---
 
-## 🔗 Live Demo
+## 🌟 Key Features
 
-Check out Meme Vault in action: [https://your-meme-vault-demo-link.com](https://your-meme-vault-demo-link.com)
+- 🔓 **Public Meme Sharing** – Anyone can view a shared meme, even without logging in.
+- 🔐 **Auth-Guarded Interactions** – Users must log in to like, comment, save, or explore more memes.
+- 📤 **Meme Uploading** – Upload your favorite memes and share them with the world.
+- ❤️ **Like & Save** – Save your favorite memes and express your love.
+- 💬 **Commenting System** – Start meme-worthy conversations.
+- 📎 **Sharable Links** – Seamlessly share memes across platforms.
+- ⚡ **High Performance** – Caching with Redis, optimized APIs with Spring Boot, and blazing-fast frontend with Vite.
 
 ---
 
-## 🚀 Tech Stack
+## 🔗 How Meme Sharing Works
 
-| Frontend | Backend | Database | Auth |
-|---------|---------|----------|------|
-| React / Next.js / HTML / CSS | Node.js / Express | MongoDB / Firebase | JWT / Firebase Auth |
+When a user shares a meme:
+
+- The recipient receives a **direct link** (e.g., `/meme/:id`) and can view the meme **without being logged in**.
+- Any actions beyond viewing—such as **liking**, **commenting**, **saving**, or **browsing more memes**—require the recipient to **log in first**.
+- Post-login, users are redirected **back to the originally shared meme** for a seamless experience.
+
+This creates a frictionless invite mechanism while preserving the value of signing up.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer            | Technology                     |
+|------------------|--------------------------------|
+| **Frontend**     | React + TypeScript + Vite      |
+| **Backend**      | Java + Spring Boot             |
+| **Database**     | MongoDB                        |
+| **Authentication** | JWT (JSON Web Tokens)       |
+| **Caching**      | Redis                          |
+| **Containerization** | Docker                    |
 
 ---
 
 ## 📸 Screenshots
 
-| Meme Page (Logged Out) | Meme Page (Logged In) |
-|------------------------|-----------------------|
-| ![public view](https://your-image-url.com/public.png) | ![logged in](https://your-image-url.com/loggedin.png) |
+> *(Add these images to a `screenshots/` folder in your GitHub repo)*
+
+### 🔓 Shared Meme (Public View)
+![Public Meme View](screenshots/public-view.png)
 
 ---
 
-## 🔑 How Meme Sharing Works
-
-When you share a meme:
-- The **recipient can view the meme** even if they’re not logged in.
-- To **like, save, comment**, or explore more memes, the user must **log in**.
-
-This gives a sneak peek while still encouraging sign-ups!
+### 🔒 Logged-In View
+![Logged In View](screenshots/logged-in.png)
 
 ---
 
-## 🛠️ Local Development
+## 🧩 Architecture Overview
 
-```bash
-# Clone the repository
-git clone https://github.com/your-username/meme-vault.git
-cd meme-vault
++-------------+ +---------------+ +-------------+ | Frontend | <---> | Backend API | <---> | MongoDB | | React+Vite | | Spring Boot | | | +-------------+ +-------+-------+ +-------------+ | v +---------+ | Redis | +---------+
 
-# Install dependencies
-npm install
 
-# Set environment variables
-cp .env.example .env
 
-# Run the development server
-npm run dev
+---
+
+## ✨ Future Enhancements
+
+- 🔎 Advanced search & meme tagging  
+- 🧠 AI-powered meme suggestions  
+- 🏆 Meme leaderboard & weekly highlights  
+- 📈 Analytics dashboard for meme performance  
+- 🌐 Multi-language support  
+- 📲 PWA & mobile app version  
+
+
+## 👨‍💻 Author
+
+**Karan Pareek**  
+📧 softwaredev1112@gmail.com  
+🌐 [LinkedIn](www.linkedin.com/in/karan-pareek-337067270)  
+
+---
+
+> 💡 _“Memes are the DNA of our culture — Meme Vault preserves them forever.”_
