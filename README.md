@@ -52,7 +52,7 @@ This creates a frictionless invite mechanism while preserving the value of signi
 
 ## 🧩 Architecture Overview
 
-```
+```plaintext
                      +----------------------+
                      |     Frontend         |
                      |  React + Vite + TS   |
@@ -73,7 +73,8 @@ This creates a frictionless invite mechanism while preserving the value of signi
         +-------------+                +-------------+
 
         🔐 Secured with JWT     🐳 Deployed using Docker
-        
+
+```
 
 ## ✨ Future Enhancements
 
