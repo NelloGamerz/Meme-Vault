@@ -1,50 +1,86 @@
-# React + TypeScript + Vite
+# 🤣 Meme Vault
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Meme Vault** is the ultimate meme-sharing platform where humor meets technology. Built with a modern stack and designed for seamless user experience, Meme Vault lets you explore, share, and interact with memes—while keeping advanced features gated behind secure authentication.
 
-Currently, two official plugins are available:
+> A day without a meme is a day wasted.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## Expanding the ESLint configuration
+## 🌟 Key Features
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+- 🔓 **Public Meme Sharing** – Anyone can view a shared meme, even without logging in.
+- 🔐 **Auth-Guarded Interactions** – Users must log in to like, comment, save, or explore more memes.
+- 📤 **Meme Uploading** – Upload your favorite memes and share them with the world.
+- ❤️ **Like & Save** – Save your favorite memes and express your love.
+- 💬 **Commenting System** – Start meme-worthy conversations.
+- 📎 **Sharable Links** – Seamlessly share memes across platforms.
+- ⚡ **High Performance** – Caching with Redis, optimized APIs with Spring Boot, and blazing-fast frontend with Vite.
 
-- Configure the top-level `parserOptions` property like this:
+---
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+## 🔗 How Meme Sharing Works
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+When a user shares a meme:
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+- The recipient receives a **direct link** (e.g., `/meme/:id`) and can view the meme **without being logged in**.
+- Any actions beyond viewing—such as **liking**, **commenting**, **saving**, or **browsing more memes**—require the recipient to **log in first**.
+- Post-login, users are redirected **back to the originally shared meme** for a seamless experience.
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+This creates a frictionless invite mechanism while preserving the value of signing up.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer            | Technology                     |
+|------------------|--------------------------------|
+| **Frontend**     | React + TypeScript + Vite      |
+| **Backend**      | Java + Spring Boot             |
+| **Database**     | MongoDB                        |
+| **Authentication** | JWT (JSON Web Tokens)       |
+| **Caching**      | Redis                          |
+| **Containerization** | Docker                    |
+
+---
+
+## 📸 Screenshots
+
+> *(Add these images to a `screenshots/` folder in your GitHub repo)*
+
+### 🔓 Shared Meme (Public View)
+![Public Meme View](screenshots/public-view.png)
+
+---
+
+### 🔒 Logged-In View
+![Logged In View](screenshots/logged-in.png)
+
+---
+
+## 🧩 Architecture Overview
+
++-------------+ +---------------+ +-------------+ | Frontend | <---> | Backend API | <---> | MongoDB | | React+Vite | | Spring Boot | | | +-------------+ +-------+-------+ +-------------+ | v +---------+ | Redis | +---------+
+
+
+
+---
+
+## ✨ Future Enhancements
+
+- 🔎 Advanced search & meme tagging  
+- 🧠 AI-powered meme suggestions  
+- 🏆 Meme leaderboard & weekly highlights  
+- 📈 Analytics dashboard for meme performance  
+- 🌐 Multi-language support  
+- 📲 PWA & mobile app version  
+
+
+## 👨‍💻 Author
+
+**Karan Pareek**  
+📧 softwaredev1112@gmail.com  
+🌐 [LinkedIn](www.linkedin.com/in/karan-pareek-337067270)  
+
+---
+
+> 💡 _“Memes are the DNA of our culture — Meme Vault preserves them forever.”_
