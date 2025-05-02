@@ -1,0 +1,48 @@
+spring:
+    application:
+       name: Meme-Website
+    data:
+       redis:
+           host: ${REDIS_HOST}
+           port: ${REDIS_PORT}
+           password: ${REDIS_PASSWORD}
+       mongodb:
+           uri: ${MONGODB_URI}
+           database: ${MONGODB_DATABASE}
+           auto-index-creation: true
+    mail:
+       host: ${MAIL_HOST}
+       port: ${MAIL_PORT}
+       username: ${MAIL_USERNAME}
+       password: ${MAIL_PASSWORD}
+       properties:
+           mail:
+               smtp:
+                   auth: true
+                   starttls:
+                       enable: true
+                       required: true
+
+    servlet:
+        multipart:
+            max-file-size: 15MB
+            max-request-size: 15MB
+
+server:
+   port: ${PORT:8080}
+
+jwt:
+    secret: ${SECURITY_SECRET_KEY}
+
+cloudinary:
+   cloudname: ${CLOUDINARY_CLOUD_NAME}
+   api-key: ${CLOUDINARY_API_KEY}
+   api-secret: ${CLOUDINARY_API_SECRET}
+
+
+logging:
+   level:
+       root: INFO
+
+frontend:
+   url: ${FRONTEND_URL}
