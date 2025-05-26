@@ -123,7 +123,8 @@ const setInLocalStorage = (key: string, value: unknown): void => {
   }
 };
 
-const WS_URL = "ws://localhost:8080/ws";
+// const WS_URL = "ws://localhost:8080/ws";
+const WS_URL = import.meta.env.VITE_WEBSOCKET_URL
 
 export const useMemeStore = create<MemeStore>((set, get) => ({
   memes: [],
