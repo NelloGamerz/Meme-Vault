@@ -80,6 +80,7 @@ const useAuth = () => {
 
       toast.success("Successfully registered!")
       localStorage.setItem('user', JSON.stringify(response.data));
+      useMemeStore.getState().connectWebSocket();
       return response.data
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
