@@ -17,15 +17,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import com.example.Meme.Website.WebSockets.WebSocketSessionManager;
 import com.example.Meme.Website.models.Comments;
 import com.example.Meme.Website.models.Meme;
 import com.example.Meme.Website.models.userModel;
 import com.example.Meme.Website.repository.commentRepository;
 import com.example.Meme.Website.repository.memeRepository;
 import com.example.Meme.Website.repository.userRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.jsonwebtoken.io.IOException;
 import lombok.extern.slf4j.Slf4j;
@@ -46,15 +51,12 @@ public class memeService {
     private MongoTemplate mongoTemplate;
     @Autowired
     private RedisService redisService;
-//    @Autowired
-//    private Drive driveService;
-//
-//    @Autowired
-//    private ImageKitService imageKitService;
+    @Autowired
+    private ObjectMapper objectMapper;
+
 
     @Transactional
     public ResponseEntity<List<Meme>> getAllMemes() {
-        // Try to fetch memes from Redis
         List<Meme> memes = redisService.getList("AllMemes", Meme.class);
 
         if (memes != null && !memes.isEmpty()) {
@@ -62,11 +64,9 @@ public class memeService {
             return ResponseEntity.ok(memes);
         }
 
-        // If not found in Redis, fetch from database
         memes = memeRepository.findAll();
 
         if (!memes.isEmpty()) {
-            // Store the fetched memes in Redis for future use (cache for 10 minutes)
             redisService.set("AllMemes", memes, 10, TimeUnit.MINUTES);
             System.out.println("🔄 Caching memes in Redis for 10 minutes");
         }
@@ -93,7 +93,6 @@ public class memeService {
     }
 
     @Transactional
-    // Function to get all the user stats
     public Map<String, Object> getUserStats(userModel user) {
         Map<String, Object> response = new HashMap<>();
 
@@ -110,7 +109,6 @@ public class memeService {
     }
 
     @Transactional
-    // Function by which user can like meme
     public ResponseEntity<?> likedMemes(String username, String memeId, boolean like) {
         try {
             Optional<userModel> optionalUser = userRepository.findByUsername(username);
@@ -131,31 +129,46 @@ public class memeService {
                 likedMemes = new ArrayList<>();
             }
 
+            String message;
             if (like) {
                 if (!likedMemes.contains(meme)) {
                     likedMemes.add(meme);
                     meme.setLikecount(meme.getLikecount() + 1);
-
+                    message = "Meme liked successfully";
+                    System.out.println("Meme liked by user: " + username);
+                } else {
+                    message = "Meme already liked";
                 }
             } else {
-                likedMemes.remove(meme);
-                meme.setLikecount(meme.getLikecount() - 1);
+                if (likedMemes.contains(meme)) {
+                    likedMemes.remove(meme);
+                    meme.setLikecount(Math.max(0, meme.getLikecount() - 1));
+                    message = "Meme unliked successfully";
+                    System.out.println("Meme unliked by user: " + username);
+                } else {
+                    message = "Meme was not previously liked";
+                }
             }
 
             user.setLikedMemes(likedMemes);
             userRepository.save(user);
             memeRepository.save(meme);
 
-            return ResponseEntity.ok(like ? "Meme liked successfully" : "Meme unliked successfully");
+            // Return structured response with likeCount
+            ObjectNode response = new ObjectMapper().createObjectNode();
+            response.put("message", message);
+            response.put("likeCount", meme.getLikecount());
+
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("An error occurred while updating liked memes: " + e.getMessage());
         }
     }
 
     @Transactional
-    // Function by which user can save or unsave a meme
     public ResponseEntity<?> saveMeme(String username, String memeId, boolean save) {
         try {
             Optional<userModel> optionalUser = userRepository.findByUsername(username);
@@ -176,21 +189,36 @@ public class memeService {
                 savedMemes = new ArrayList<>();
             }
 
+            String message;
             if (save) {
                 if (!savedMemes.contains(meme)) {
                     savedMemes.add(meme);
                     meme.setSaveCount(meme.getSaveCount() + 1);
+                    message = "Meme saved successfully";
+                    System.out.println("Meme saved by user: " + username);
+                } else {
+                    message = "Meme already saved";
                 }
             } else {
-                savedMemes.remove(meme);
-                meme.setSaveCount(meme.getSaveCount() - 1);
+                if (savedMemes.contains(meme)) {
+                    savedMemes.remove(meme);
+                    meme.setSaveCount(Math.max(0, meme.getLikecount() - 1));
+                    message = "Meme unsaved successfully";
+                    System.out.println("Meme unsaved by user: " + username);
+                } else {
+                    message = "Meme was not previously saved";
+                }
             }
 
             user.setSavedMemes(savedMemes);
             userRepository.save(user);
             memeRepository.save(meme);
 
-            return ResponseEntity.ok(save ? "Meme saved successfully" : "Meme unsaved successfully");
+            ObjectNode response = new ObjectMapper().createObjectNode();
+            response.put("message", message);
+            response.put("saveCount", meme.getSaveCount());
+
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -237,7 +265,7 @@ public class memeService {
                             "overwrite", true));
 
             String mediaUrl = uploadResult.get("secure_url").toString();
-            String format = uploadResult.get("format").toString();
+            uploadResult.get("format").toString();
             String mediaType = isVideo ? "video" : "image";
 
             // 🔹 Fetch the user from MongoDB
@@ -269,7 +297,6 @@ public class memeService {
         }
     }
 
-
     @Transactional
     public ResponseEntity<?> getAllLikedMemes(String username) {
         Optional<userModel> optionalUser = userRepository.findByUsername(username);
@@ -296,66 +323,80 @@ public class memeService {
         return ResponseEntity.ok(savedMemes);
     }
 
-//    @Transactional
-//    // Comments Functionality
-//    public ResponseEntity<?> addCommentsToMeme(String memeId, String username, String Comment,
-//            String profilePictureUrl, String userId) {
-//        Optional<Meme> optionalMeme = memeRepository.findById(memeId);
-//
-//        if (optionalMeme.isEmpty()) {
-//            return ResponseEntity.status(404).body("Meme not found");
-//        }
-//
-//        Meme meme = optionalMeme.get();
-//        Comments comment = new Comments(null, userId, memeId, username, Comment, new Date(), profilePictureUrl);
-//
-//        commentRepository.save(comment);
-//
-//        if (meme.getComments() == null) {
-//            meme.setComments(new ArrayList<>());
-//        }
-//        meme.getComments().add(comment);
-//        memeRepository.save(meme);
-//
-//        return ResponseEntity.ok(comment);
-//    }
-
     @Transactional
-    public Comments addCommentsToMeme(Comments comment) {
+    public Comments addCommentsToMeme(Comments comment) throws IOException, java.io.IOException {
+        System.out.println("Starting addCommentsToMeme()...");
+
         Optional<Meme> optionalMeme = memeRepository.findById(comment.getMemeId());
 
         if (optionalMeme.isEmpty()) {
+            System.out.println("Meme not found with ID: " + comment.getMemeId());
             throw new RuntimeException("Meme not found");
         }
 
-        // Save comment
-        Comments savedComment = commentRepository.save(comment);
-
-        // Update meme's comments
         Meme meme = optionalMeme.get();
+        System.out.println("Found meme with ID: " + meme.getId());
+
+        // Save the new comment
+        Comments savedComment = commentRepository.save(comment);
+        System.out.println("Saved comment with ID: " + savedComment.getId());
+
+        // Update meme's comment list
         if (meme.getComments() == null) {
+            System.out.println("Meme has no existing comments. Initializing comment list...");
             meme.setComments(new ArrayList<>());
         }
+
         meme.getComments().add(savedComment);
         Meme updatedMeme = memeRepository.save(meme);
+        System.out.println("Updated meme with new comment. Meme ID: " + updatedMeme.getId());
 
+        // Update Redis cache
         String redisKey = "AllMemes";
         List<Meme> memeList = redisService.getList(redisKey, Meme.class);
+        System.out.println("Fetched meme list from Redis. List size: " + (memeList != null ? memeList.size() : 0));
 
         if (memeList != null) {
             for (int i = 0; i < memeList.size(); i++) {
                 if (memeList.get(i).getId().equals(updatedMeme.getId())) {
-                    memeList.set(i, updatedMeme); // Replace the meme with updated one
+                    memeList.set(i, updatedMeme);
+                    System.out.println("Updated meme in Redis list at index: " + i);
                     break;
                 }
             }
-            // 4. Set updated list back to Redis with TTL
             redisService.set(redisKey, memeList, 10, TimeUnit.MINUTES);
+            System.out.println("Updated Redis cache with modified meme list.");
         }
 
+        // --- WebSocket Broadcast Section ---
+        ObjectNode messageNode = objectMapper.valueToTree(savedComment);
+        messageNode.put("type", "COMMENT");
+        String payload = objectMapper.writeValueAsString(messageNode);
+        TextMessage message = new TextMessage(payload);
+        System.out.println("Constructed WebSocket message payload.");
+
+        // 1. Broadcast to post viewers
+        Set<WebSocketSession> viewers = WebSocketSessionManager.getPostSessions(meme.getId());
+        System.out.println("Broadcasting to " + viewers.size() + " post viewers...");
+        for (WebSocketSession viewerSession : viewers) {
+            if (viewerSession.isOpen()) {
+                viewerSession.sendMessage(message);
+            }
+        }
+
+        // 2. Notify post owner
+        String ownerId = meme.getUserId();
+        WebSocketSession ownerSession = WebSocketSessionManager.getSession(ownerId);
+        if (ownerSession != null && ownerSession.isOpen()) {
+            System.out.println("Sending WebSocket message to post owner with user ID: " + ownerId);
+            ownerSession.sendMessage(message);
+        } else {
+            System.out.println("Post owner WebSocket session not found or not open for user ID: " + ownerId);
+        }
+
+        System.out.println("Finished addCommentsToMeme(). Returning saved comment.");
         return savedComment;
     }
-
 
     @Transactional
     public ResponseEntity<List<Comments>> getMemeComments(String memeId) {

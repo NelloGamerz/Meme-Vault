@@ -9,8 +9,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.example.Meme.Website.services.ProfileService;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 @RestController
-@RequestMapping("/api/profile")
+@RequestMapping("/profile")
 public class ProfileController {
 
     @Autowired
@@ -44,8 +46,8 @@ public class ProfileController {
 
     @PutMapping("/{userId}/update-username")
     public ResponseEntity<?> changeUsername(@PathVariable String userId,
-            @RequestBody Map<String, String> request) {
-        return profileService.changeUsername(userId, request);
+            @RequestBody Map<String, String> request, HttpServletResponse response) {
+        return profileService.changeUsername(userId, request, response);
     }
 
 }

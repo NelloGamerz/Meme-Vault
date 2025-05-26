@@ -21,10 +21,7 @@ export const ForgotPasswordForm: React.FC = () => {
     setError(null)
 
     try {
-      // Make actual API call to request password reset
       await requestPasswordReset(email)
-
-      // If successful, show success message
       setIsSubmitted(true)
     } catch (err) {
       setError(`Failed to send reset link. ${err instanceof Error ? err.message : "Please try again."}`)
@@ -33,7 +30,6 @@ export const ForgotPasswordForm: React.FC = () => {
     }
   }
 
-  // Function to handle navigation to login page
   const goToLogin = () => {
     navigate("/login")
   }

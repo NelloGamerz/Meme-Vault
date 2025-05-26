@@ -20,7 +20,7 @@ import com.example.Meme.Website.models.Meme;
 import com.example.Meme.Website.services.memeService;
 
 @RestController
-@RequestMapping("/api/memes")
+@RequestMapping("/memes")
 public class MemeController {
 
     @Autowired
@@ -37,7 +37,6 @@ public class MemeController {
         return memeService.getUserUploadedMemes(username);
     }
 
-    // Fetch all memes
     @GetMapping
     public ResponseEntity<List<Meme>> getAllMemes() {
         return memeService.getAllMemes();

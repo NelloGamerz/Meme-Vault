@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.Meme.Website.Security.CookieUtil;
 import com.example.Meme.Website.dto.AuthRequest;
 import com.example.Meme.Website.dto.AuthResponse;
 import com.example.Meme.Website.dto.PasswordResetRequest;
@@ -24,6 +26,8 @@ import com.example.Meme.Website.dto.RegisterResponse;
 import com.example.Meme.Website.models.userModel;
 import com.example.Meme.Website.repository.userRepository;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
@@ -44,28 +48,41 @@ public class AuthService {
     @Autowired
     private UserDetailsServiceImpl userDetailsService;
 
+    @Autowired
+    private RedisService redisService;
+
+    @Autowired
+    private ApplicationContext context;
+
+    @Autowired
+    private CookieUtil cookieUtil;
+
+
     @Transactional
     public ResponseEntity<RegisterResponse> registerUser(userModel user) {
         try {
             log.info("Attempting to register user with {} ", user.getUsername());
 
-            if (userRepository.existsByUsername(user.getUsername()) && userRepository.existsByEmail(user.getEmail())) {
-                log.warn("Registration Failed: Username {} and Email {} already exists. ", user.getUsername(),
+            boolean usernameExists = userRepository.existsByUsername(user.getUsername());
+            boolean emailExists = userRepository.existsByEmail(user.getEmail());
+
+            if (usernameExists && emailExists) {
+                log.warn("Registration Failed: Username {} and Email {} already exist.", user.getUsername(),
                         user.getEmail());
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(new RegisterResponse("Username and Email already exists", null, null));
+                        .body(new RegisterResponse("Username and Email already exist", null, null, null));
             }
 
-            if (userRepository.existsByUsername(user.getUsername())) {
+            if (usernameExists) {
                 log.warn("Registration failed: Username {} already registered", user.getUsername());
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(new RegisterResponse("Username already exists", null, null));
+                        .body(new RegisterResponse("Username already exists", null, null, null));
             }
 
-            if (userRepository.existsByEmail(user.getEmail())) {
+            if (emailExists) {
                 log.warn("Registration failed: Email {} already registered", user.getEmail());
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(new RegisterResponse("Email already exists", null, null));
+                        .body(new RegisterResponse("Email already exists", null, null, null));
             }
 
             user.setPassword(passwordEncoder.encode(user.getPassword()));
@@ -81,17 +98,30 @@ public class AuthService {
             user.setFollowing(new ArrayList<>());
 
             userModel savedUser = userRepository.save(user);
-            String token = jwtservice.generateToken(savedUser.getUsername(), 60);
 
-            log.info("User registered successfully with username {}", user.getUsername());
+            // Token Expiry
+            long accessTokenExpiry = 60; // in minutes
+            long refreshTokenExpiry = 60 * 24 * 7; // in minutes (7 days)
+
+            String accessToken = jwtservice.generateToken(savedUser.getUsername(), accessTokenExpiry, "accessToken");
+            String refreshToken = jwtservice.generateToken(savedUser.getUsername(), refreshTokenExpiry, "refreshToken");
+
+            // ✅ Store refresh token in Redis
+            redisService.setToken("refresh_token", savedUser.getUsername(), refreshToken, refreshTokenExpiry * 60); // seconds
+
+            log.info("User registered successfully with username {}", savedUser.getUsername());
+
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new RegisterResponse(savedUser.getUsername(), token, savedUser.getUserId()));
+                    .body(new RegisterResponse(savedUser.getUsername(), accessToken, refreshToken,
+                            savedUser.getUserId()));
+
         } catch (Exception e) {
             log.error("Error during registration {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new RegisterResponse("Registration failed! Please try again later.", null, null));
+                    .body(new RegisterResponse("Registration failed! Please try again later.", null, null, null));
         }
     }
+
 
     @Transactional
     public AuthResponse authenticate(AuthRequest request) {
@@ -108,12 +138,18 @@ public class AuthService {
             throw new BadCredentialsException("Invalid username or password");
         }
 
-        long expiryDuration = request.isRememberMe() ? 7 * 24 * 60 : 24 * 60; 
+        long accessTokenExpiry = 1; // in minutes
+        long refreshTokenExpiry = request.isRememberMe() ? 60 * 24 * 7 : 60 * 24; // in minutes
 
-        String token = jwtservice.generateToken(request.getUsername(), expiryDuration);
+        String accessToken = jwtservice.generateToken(request.getUsername(), accessTokenExpiry, "accessToken");
+        String refreshToken = jwtservice.generateToken(request.getUsername(), refreshTokenExpiry, "refreshToken");
+
+        // Store refresh token in Redis with dynamic key
+        redisService.setToken("refresh_token", request.getUsername(), refreshToken, refreshTokenExpiry * 60);
 
         log.info("Authentication successful for username: {}", request.getUsername());
-        return new AuthResponse(token, user.getUsername(), user.getUserId());
+
+        return new AuthResponse(accessToken, refreshToken, user.getUsername(), user.getUserId());
     }
 
     @Transactional
@@ -131,7 +167,7 @@ public class AuthService {
         }
 
         userModel user = userOptional.get();
-        String resetToken = jwtservice.generateToken(user.getUsername(), 15); // 15-min expiry
+        String resetToken = jwtservice.generateToken(user.getUsername(), 15, "accessToken"); // 15-min expiry
 
         log.info("Generated reset token for user: {}", user.getUsername());
 
@@ -152,18 +188,15 @@ public class AuthService {
 
         log.info("Received password reset request.");
 
-        // Extract username from token
         String username = jwtservice.extractUserName(token);
         log.info("Extracted username from token: {}", username);
 
-        // Fetch user and validate existence
         userModel user = userRepository.findByUsername(username)
                 .orElseThrow(() -> {
                     log.warn("User not found for username: {}", username);
                     return new ResponseStatusException(HttpStatus.BAD_REQUEST, "User not found");
                 });
 
-        // Validate JWT Token
         UserDetails userDetails = userDetailsService.loadUserByUsername(username);
         if (!jwtservice.validateToken(token, userDetails)) {
             log.warn("Invalid or expired token for user: {}", username);
@@ -172,13 +205,11 @@ public class AuthService {
 
         log.info("JWT token validated successfully for user: {}", username);
 
-        // Check if new password is the same as the old one
         if (passwordEncoder.matches(newPassword, user.getPassword())) {
             log.warn("User {} attempted to reset with the same password", username);
             return ResponseEntity.badRequest().body("New password cannot be the same as the old password");
         }
 
-        // Hash new password and update user record
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
@@ -186,4 +217,47 @@ public class AuthService {
 
         return ResponseEntity.ok("Password reset successful");
     }
+
+
+    public void refreshAccessToken(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        String accessToken = jwtservice.extractTokenFromCookies(request);
+        String username = null;
+
+        if (accessToken != null) {
+            try {
+                username = jwtservice.extractUserName(accessToken);
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Fallback to username cookie
+        if (username == null) {
+            username = jwtservice.extractUsernameFromCookie(request); // Custom method
+            if (username == null) {
+                throw new Exception("No username available to refresh access token.");
+            }
+        }
+
+        UserDetails userDetails = context.getBean(UserDetailsServiceImpl.class).loadUserByUsername(username);
+        String storedRefreshToken = redisService.getToken("refresh_token", username);
+
+        if (storedRefreshToken != null && jwtservice.validateToken(storedRefreshToken, userDetails)) {
+            // ✅ New access token
+            String newAccessToken = jwtservice.generateToken(username, 60, "access_token");
+            cookieUtil.addCookie(response, "access_token", newAccessToken, 60);
+
+            // 🔁 Rotate refresh token if expiring soon
+            if (jwtservice.willExpireSoon(storedRefreshToken, 10)) {
+                String newRefreshToken = jwtservice.generateToken(username, 60 * 24 * 7, "refresh_token");
+                redisService.setToken("refresh_token", username, newRefreshToken, 60 * 24 * 7 * 60);
+            }
+
+            // ✅ Refresh username cookie too (sliding expiration)
+            cookieUtil.addCookie(response, "username", username, 60 * 60 * 24 * 7); // 7 days again
+        } else {
+            redisService.deleteToken("refresh_token", username);
+            throw new Exception("Refresh token invalid or expired.");
+        }
+    }
+
 }

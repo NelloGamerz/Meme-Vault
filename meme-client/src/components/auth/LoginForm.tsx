@@ -20,7 +20,6 @@ export const LoginForm: React.FC = () => {
       await login(formData);
       navigate('/');
     } catch (err) {
-      // Error is handled by useAuth hook
       console.error(err);
     }
   };

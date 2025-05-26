@@ -92,12 +92,6 @@ export const MemeCard: React.FC<MemeCardProps> = ({ meme, activeOptionsId, onOpt
     }
   }
 
-  // const handleEdit = (e: React.MouseEvent) => {
-  //   e.stopPropagation()
-  //   console.log("Edit meme:", meme.id)
-  //   onOptionsClick(null)
-  // }
-
   const navigateToMemeDetail = () => {
     navigate(`/meme/${meme.id}`)
   }
@@ -105,8 +99,6 @@ export const MemeCard: React.FC<MemeCardProps> = ({ meme, activeOptionsId, onOpt
   const handleMouseEnter = () => {
     if (isVideo && videoRef.current) {
       videoRef.current.play().catch(() => {
-        // Autoplay was prevented
-        console.log("Autoplay prevented")
       })
       setIsPlaying(true)
     }

@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth"
 import { Button } from "../components/ui/Button"
 import { useMemeStore } from "../store/useMemeStore"
 import { MemeCard } from "../components/mainPage/MemeCard"
+import { useWebSocketStore } from "../hooks/useWebSockets"
 
 export const MainPage: React.FC = () => {
   const { logout } = useAuth()
@@ -18,12 +19,16 @@ export const MainPage: React.FC = () => {
     isLoading,
     error,
     profilePictureUrl,
-    // fetchUserData,
     fetchUserProfile
   } = useMemeStore()
+  
   const [searchQuery, setSearchQuery] = useState("")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isSearchActive, setIsSearchActive] = useState(false)
+
+  useEffect(() => {
+    useWebSocketStore.getState().restoreConnection();
+  }, []);
 
   useEffect(() => {
     fetchMemes();
@@ -39,7 +44,6 @@ export const MainPage: React.FC = () => {
       fetchMemes()
       setIsSearchActive(false)
     }
-    // Close mobile menu after search on small screens
     setMobileMenuOpen(false)
   }
 
@@ -64,7 +68,6 @@ export const MainPage: React.FC = () => {
       navigate(`/profile/${user.userId}`)
     } catch (error) {
       console.error("Error fetching profile:", error)
-      // You might want to show an error message to the user
     }
   }
 

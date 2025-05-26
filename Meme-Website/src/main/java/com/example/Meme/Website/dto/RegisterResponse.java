@@ -10,5 +10,6 @@ import lombok.NoArgsConstructor;
 public class RegisterResponse {
     private String username;
     private String token;
+    private String refreshToken;
     private String userId;
 }

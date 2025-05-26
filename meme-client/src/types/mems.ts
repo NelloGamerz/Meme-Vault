@@ -47,7 +47,7 @@ export interface Comment {
   userId: string;
   text: string;
   username: string;
-  createdAt: Date;
+  createdAt: string;
   profilePictureUrl: string;
 }
 

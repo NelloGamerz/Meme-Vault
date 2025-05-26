@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
 import { AuthTabs } from '../components/auth/AuthTabs';
 import { LoginForm } from '../components/auth/LoginForm';
 import { RegisterForm } from '../components/auth/RegisterForm';
@@ -9,16 +8,10 @@ export const AuthPage: React.FC = () => {
   useEffect(() => {
     if (localStorage.getItem("sessionExpired")) {
       toast.error("Session Expired! Please log in again.");
-      localStorage.removeItem("sessionExpired"); // Remove flag after showing toast
+      localStorage.removeItem("sessionExpired");
     }
   }, []);
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
-  
-  // Check if user is already logged in
-  const token = localStorage.getItem('token');
-  if (token) {
-    return <Navigate to="/" replace />;
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">

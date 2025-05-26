@@ -23,14 +23,11 @@ import { cn } from "../../hooks/utils"
 type TabType = "uploaded" | "liked" | "saved"
 type MediaType = "image" | "video" | null
 
-// Fix the validation functions to properly handle Promise returns
 const validateProfilePicture = (file: File): { valid: boolean; message: string } => {
-  // Check file size (less than 1MB)
   if (file.size > 1024 * 1024) {
     return { valid: false, message: "Profile picture must be less than 1MB" }
   }
 
-  // Check file type
   if (!file.type.startsWith("image/")) {
     return { valid: false, message: "File must be an image" }
   }
@@ -38,19 +35,15 @@ const validateProfilePicture = (file: File): { valid: boolean; message: string }
   return { valid: true, message: "" }
 }
 
-// Update the return type to Promise
 const validateMeme = async (file: File): Promise<{ valid: boolean; message: string }> => {
-  // Check file size (less than 5MB)
   if (file.size > 5 * 1024 * 1024) {
     return { valid: false, message: "Meme file must be less than 5MB" }
   }
 
-  // For images, check dimensions
   if (file.type.startsWith("image/")) {
     return new Promise((resolve) => {
       const img = new Image()
       img.onload = () => {
-        // Check if dimensions are valid (e.g., minimum 200x200)
         if (img.width < 200 || img.height < 200) {
           resolve({ valid: false, message: "Image dimensions must be at least 200x200 pixels" })
         } else {
@@ -64,12 +57,10 @@ const validateMeme = async (file: File): Promise<{ valid: boolean; message: stri
     })
   }
 
-  // For videos, we'll just check the file type
   if (file.type.startsWith("video/")) {
     return { valid: true, message: "" }
   }
 
-  // For other file types
   return { valid: false, message: "Unsupported file format" }
 }
 
@@ -121,10 +112,6 @@ export const ProfilePage: React.FC = () => {
     return Followers.some((follower) => follower.userId === loggedInUser.userId)
   }
 
-  // const isUserFollowing = () => {
-  //   if (!userId || isOwnProfile) return false;
-  //   return Following.some(user => user.userId === loggedInUser.userId);
-  // };
   const [editName, setEditName] = useState("")
   const [followersLoading, setFollowersLoading] = useState(false)
   const [isFollowersModalOpen, setIsFollowersModalOpen] = useState(false)
@@ -137,7 +124,6 @@ export const ProfilePage: React.FC = () => {
     }
   }, [fetchUserProfile, userId])
 
-  // Only show Upload and Saved tabs for own profile
   const tabs = [
     { id: "uploaded" as TabType, label: "Uploaded", icon: Upload },
     ...(isOwnProfile
@@ -148,7 +134,6 @@ export const ProfilePage: React.FC = () => {
       : []),
   ]
 
-  // Reset to uploaded tab if on a hidden tab
   useEffect(() => {
     if (!isOwnProfile && (activeTab === "liked" || activeTab === "saved")) {
       setActiveTab("uploaded")
@@ -175,7 +160,6 @@ export const ProfilePage: React.FC = () => {
     }, 200)
   }
 
-  // Replace the handleUpload function
   const handleUpload = async () => {
     if (!selectedFile || !title.trim()) return
 
@@ -191,7 +175,6 @@ export const ProfilePage: React.FC = () => {
     }
   }
 
-  // Replace the handleProfilePictureSelect function
   const handleProfilePictureSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
@@ -206,7 +189,6 @@ export const ProfilePage: React.FC = () => {
     }
   }
 
-  // Replace the handleProfilePictureUpload function
   const handleProfilePictureUpload = async () => {
     if (!selectedProfilePicture) return
 
@@ -242,7 +224,6 @@ export const ProfilePage: React.FC = () => {
     setSearchTerm("")
 
     try {
-      // Use existing Followers data from state instead of refetching
       if (Followers.length === 0) {
         console.warn("No followers data available")
       }
@@ -258,7 +239,6 @@ export const ProfilePage: React.FC = () => {
     setIsFollowingModalOpen(true)
     setSearchTerm("")
     try {
-      // await fetchFollowing(userId || "")
       if (Following.length === 0) {
         console.warn("No following data available")
       }
@@ -276,13 +256,11 @@ export const ProfilePage: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
-  // Replace the handleFileSelect function
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
     try {
-      // For images
       if (file.type.startsWith("image/")) {
         const validation = await validateMeme(file)
         if (!validation.valid) {
@@ -294,7 +272,6 @@ export const ProfilePage: React.FC = () => {
         setSelectedFile(file)
         setPreviewUrl(URL.createObjectURL(file))
       }
-      // For videos
       else if (file.type.startsWith("video/")) {
         const validation = await validateMeme(file)
         if (!validation.valid) {
@@ -306,7 +283,6 @@ export const ProfilePage: React.FC = () => {
         setSelectedFile(file)
         setPreviewUrl(URL.createObjectURL(file))
       }
-      // For unsupported formats
       else {
         toast.error("Please select an image or video file")
       }
@@ -344,14 +320,10 @@ export const ProfilePage: React.FC = () => {
   const handleFollow = async () => {
     if (!userId || isOwnProfile) return
 
-    // Set a local loading state if needed
     const isFollowing = isUserFollowing()
 
     try {
-      // Wait for the follow/unfollow action to complete
       await handleFollowToggle(userId, isFollowing)
-
-      // Fetch the updated profile data to refresh the UI
       await fetchUserProfile(userId)
     } catch (error) {
       console.error("Error toggling follow status:", error)

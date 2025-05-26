@@ -42,7 +42,6 @@
 }
 
 
-/* Add this to your global CSS file */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
@@ -60,13 +59,11 @@
   background-color: rgba(156, 163, 175, 0.7);
 }
 
-/* For Firefox */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
 }
 
-/* For dark mode */
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: rgba(75, 85, 99, 0.5);
 }
@@ -74,3 +71,5 @@
 .dark .custom-scrollbar {
   scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
 }
+
+

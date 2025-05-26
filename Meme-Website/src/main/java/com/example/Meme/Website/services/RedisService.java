@@ -79,4 +79,51 @@ public class RedisService {
             return new ArrayList<>();
         }
     }
+
+    public void setToken(String keyPrefix, String username, String token, long expirySecond) {
+        try {
+            String key = key(keyPrefix, username);
+            redisTemplate.opsForValue().set(key, token, expirySecond, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.error("Error setting token in Redis for user '{}': {}", username, e.getMessage());
+        }
+    }
+
+    public String getToken(String keyPrefix, String username) {
+        try {
+            String key = key(keyPrefix, username);
+            Object token = redisTemplate.opsForValue().get(key);
+            return token != null ? token.toString() : null;
+        } catch (Exception e) {
+            log.error("Error getting token from Redis for user '{}': {}", username, e.getMessage());
+            return null;
+        }
+    }
+
+    public void deleteToken(String keyPrefix, String username){
+        try{
+            String key = key(keyPrefix, username);
+            redisTemplate.delete(key);
+            log.info("Token deleted for user '{}'", username);
+        }
+        catch(Exception e){
+            log.error("Error deleting token from Redis for user '{}': {}", username, e.getMessage());
+        }
+    }
+
+    public boolean tokenExists(String keyPrefix, String username){
+        try{
+            String key = key(keyPrefix, username);
+            return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+        }
+        catch(Exception e){
+            log.error("🔴 Error checking token in Redis: {}", e.getMessage());
+            return false;
+        }
+
+    }
+
+    public String key(String keyPrefix, String username){
+        return keyPrefix + ":" + username;
+    }
 }

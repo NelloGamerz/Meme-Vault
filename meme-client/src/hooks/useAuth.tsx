@@ -1,159 +1,164 @@
-import { useState } from 'react';
-import axios from 'axios';
-import toast from 'react-hot-toast';
+"use client"
+
+import { useEffect, useState } from "react"
+import axios from "axios"
+import toast from "react-hot-toast"
+import { useMemeStore } from "../store/useMemeStore"
 
 interface LoginData {
-  username: string;
-  password: string;
-  rememberMe?: boolean;
+  username: string
+  password: string
+  rememberMe?: boolean
 }
 
 interface RegisterData {
-  username: string;
-  email: string;
-  password: string;
+  username: string
+  email: string
+  password: string
 }
 
 interface AuthError {
-  username?: string;
-  email?: string;
-  password?: string;
-  name?: string;
-  message?: string;
+  username?: string
+  email?: string
+  password?: string
+  name?: string
+  message?: string
 }
 
-const API_URL = 
-      import.meta.env.VITE_API_URL || 'https://meme-vault.onrender.com';
-      // "http://localhost:8080"
+export const API_URL =
+  import.meta.env.VITE_API_URL;
 
-export const useAuth = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<AuthError | null>(null);
+export const useAuthCheck = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    axios
+      .get(`${API_URL}auth/me`, { withCredentials: true }) // ✅ Sends cookie
+      .then(() => setIsAuthenticated(true))
+      .catch(() => setIsAuthenticated(false))
+  }, [])
+
+  return isAuthenticated
+}
+
+const useAuth = () => {
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<AuthError | null>(null)
 
   const login = async (data: LoginData) => {
     try {
-      setIsLoading(true);
-      setError(null);
-      const response = await axios.post(`${API_URL}/auth/login`, data);
-      
-      // Store the token in localStorage or a secure cookie
-      localStorage.setItem('token', response.data.token);
+      setIsLoading(true)
+      setError(null)
+      const response = await axios.post(`${API_URL}auth/login`, data, {
+        withCredentials: true,
+      })
+
+      toast.success("Successfully logged in!")
       localStorage.setItem('user', JSON.stringify(response.data));
-      
-      // Store user data if provided by the API
-      // if (response.data.user) {
-      //   localStorage.setItem('user', JSON.stringify(response.data.user));
-      // }
-      
-      toast.success('Successfully logged in!');
-      return response.data;
+      useMemeStore.getState().connectWebSocket();
+      return response.data
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
-        setError(err.response.data.errors || { message: 'Login failed' });
-        toast.error(err.response.data.message || 'Invalid username or password');
+        setError(err.response.data.errors || { message: "Login failed" })
+        toast.error(err.response.data.message || "Invalid username or password")
       } else {
-        setError({ message: 'An unexpected error occurred' });
-        toast.error('An unexpected error occurred');
+        setError({ message: "An unexpected error occurred" })
+        toast.error("An unexpected error occurred")
       }
-      throw err;
+      throw err
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const register = async (data: RegisterData) => {
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await axios.post(`${API_URL}/auth/register`, data);
-  
-      // Store the token in localStorage or a secure cookie
-      localStorage.setItem('token', response.data.token);
+      setIsLoading(true)
+      setError(null)
+
+      const response = await axios.post(`${API_URL}auth/register`, data)
+
+      toast.success("Successfully registered!")
       localStorage.setItem('user', JSON.stringify(response.data));
-  
-      // Store user data if provided by the API
-      if (response.data.user) {
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-      }
-  
-      toast.success('Successfully registered!');
-      return response.data;
+      return response.data
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
-        const errorData = err.response.data;
-        
-        // If response follows { "username": "Username already exists", "token": null }
-        const errorMessage = errorData.username || errorData.message || 'Registration failed';
-  
-        setError({ message: errorMessage });
-        toast.error(errorMessage);
+        const errorData = err.response.data
+        const errorMessage = errorData.username || errorData.message || "Registration failed"
+
+        setError({ message: errorMessage })
+        toast.error(errorMessage)
       } else {
-        setError({ message: 'An unexpected error occurred' });
-        toast.error('An unexpected error occurred');
+        setError({ message: "An unexpected error occurred" })
+        toast.error("An unexpected error occurred")
       }
-      throw err;
+      throw err
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const requestPasswordReset = async (email: string) => {
     try {
-      setIsLoading(true);
-      setError(null);
-  
-      const response = await axios.post(`${API_URL}/auth/forgot-password`, { email });
-  
-      toast.success("Password reset link sent to your email!");
-      return response.data;
+      setIsLoading(true)
+      setError(null)
+
+      const response = await axios.post(`${API_URL}auth/forgot-password`, { email })
+
+      toast.success("Password reset link sent to your email!")
+      return response.data
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
-        const errorData = err.response.data;
-        const errorMessage = errorData.message || "Failed to send reset link";
-  
-        setError({ message: errorMessage });
-        toast.error(errorMessage);
+        const errorData = err.response.data
+        const errorMessage = errorData.message || "Failed to send reset link"
+
+        setError({ message: errorMessage })
+        toast.error(errorMessage)
       } else {
-        setError({ message: "An unexpected error occurred" });
-        toast.error("An unexpected error occurred");
+        setError({ message: "An unexpected error occurred" })
+        toast.error("An unexpected error occurred")
       }
-      throw err;
+      throw err
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const resetPassword = async (password: string, token: string) => {
     if (!token) {
-      throw new Error("Invalid or expired token");
+      throw new Error("Invalid or expired token")
     }
 
     try {
-      // Make the API call using Axios
-      const response = await axios.post(`${API_URL}/auth/reset-password`, {
+      const response = await axios.post(`${API_URL}auth/reset-password`, {
         token,
         newPassword: password,
-      });
+      })
 
-      return response.data;
+      return response.data
     } catch (error) {
-      console.error("Password reset error:", error);
-
-      // Extract error message from response if available
-      const errorMessage = "Failed to reset password";
-      throw new Error(errorMessage);
+      console.error("Password reset error:", error)
+      const errorMessage = "Failed to reset password"
+      throw new Error(errorMessage)
     }
-  };
+  }
 
-    
+  const checkUsernameAvailability = () => { }
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    // localStorage.removeItem("userData")  
-    toast.success('Successfully logged out!');
-  };
+  const logout = async () => {
+  try {
+    await axios.post(`${API_URL}auth/logout`, {}, {
+      withCredentials: true,
+    })
+
+    localStorage.removeItem("user")
+    useMemeStore.getState().disconnectWebSocket();
+    toast.success("Successfully logged out!")
+  } catch (error) {
+    toast.error("Failed to log out. Please try again.")
+    console.error("Logout error:", error)
+  }
+}
 
   return {
     login,
@@ -161,7 +166,10 @@ export const useAuth = () => {
     logout,
     requestPasswordReset,
     resetPassword,
+    checkUsernameAvailability,
     isLoading,
-    error
-  };
-};
+    error,
+  }
+}
+
+export {useAuth}
