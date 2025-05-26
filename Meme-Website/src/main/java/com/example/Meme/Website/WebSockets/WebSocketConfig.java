@@ -20,7 +20,7 @@ public class WebSocketConfig implements WebSocketConfigurer{
     @Autowired
     private memeService memeService;
 
-    @Value("${frontend.url}")
+    @Value("${frontend.websocket.url}")
     private String frontendUrl;
     
     @Override
