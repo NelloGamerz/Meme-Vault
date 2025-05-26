@@ -9,27 +9,15 @@ import jakarta.servlet.http.HttpServletResponse;
 @Component
 public class CookieUtil {
 
-    // public void addCookie(HttpServletResponse response, String name, String
-    // value, int MaxAge) {
-    // Cookie cookie = new Cookie(name, value);
-    // cookie.setPath("/");
-    // cookie.setHttpOnly(true);
-    // cookie.setMaxAge(MaxAge);
-    // response.addCookie(cookie);
-    // }
-
     public void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
         Cookie cookie = new Cookie(name, value);
         cookie.setPath("/");
         cookie.setHttpOnly(true);
-        cookie.setSecure(true); // important for HTTPS in production
+        cookie.setSecure(true);
         cookie.setMaxAge(maxAge);
 
-        // Add the cookie normally
         response.addCookie(cookie);
 
-        // Manually add SameSite=None to the cookie header (overriding default)
-        // This is necessary because Cookie class doesn't have SameSite setter
         StringBuilder cookieHeader = new StringBuilder();
         cookieHeader.append(name).append("=").append(value)
                 .append("; Path=/")
