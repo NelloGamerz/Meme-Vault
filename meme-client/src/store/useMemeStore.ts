@@ -150,6 +150,7 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
     if (wsClient && wsClient.readyState === WebSocket.OPEN) return;
 
     wsClient = new WebSocket(WS_URL);
+    console.log("Connecting to WebSocket:", WS_URL);
 
     wsClient.onopen = () => {
       set({ wsClient });
