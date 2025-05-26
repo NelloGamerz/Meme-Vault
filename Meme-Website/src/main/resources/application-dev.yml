@@ -47,4 +47,4 @@ logging:
 frontend:
    url: ${FRONTEND_URL}
    websocket:
-         url: ${FRONTEND_WEBSOCKET_URL}
+        url: ${FRONTEND_WEBSOCKET_URL}
