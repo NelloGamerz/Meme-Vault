@@ -33,7 +33,7 @@ export const useAuthCheck = () => {
 
   useEffect(() => {
     axios
-      .get(`${API_URL}auth/me`, { withCredentials: true }) // ✅ Sends cookie
+      .get(`${API_URL}auth/me`, { withCredentials: true })
       .then(() => setIsAuthenticated(true))
       .catch(() => setIsAuthenticated(false))
   }, [])
