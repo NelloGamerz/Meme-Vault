@@ -15,8 +15,8 @@ export const ExplorePage = () => {
   };
 
   return (
-    <div className="p-6">
-      <div className="max-w-2xl mx-auto mb-8">
+    <div className="p-4 sm:p-6">
+      <div className="max-w-2xl mx-auto mb-6 sm:mb-8">
         <form onSubmit={handleSearch} className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
@@ -34,7 +34,7 @@ export const ExplorePage = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
           {memes.map((meme) => (
             <MemeCard key={meme.id} meme={meme} />
           ))}
