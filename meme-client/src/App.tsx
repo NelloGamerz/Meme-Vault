@@ -21,7 +21,7 @@ function App() {
   return (
     <>
       <Routes>
-        <Route path="/forgot-password" element={<ForgotPasswordForm />} />
+        <Route path="/forgot-password\" element={<ForgotPasswordForm />} />
         <Route path="/reset-password" element={<PasswordResetPage />} />
         <Route path="/reset-password/:id" element={<PasswordResetPage />} />
         <Route path="/auth" element={<AuthPage />} />
@@ -84,7 +84,7 @@ function App() {
             </Layout>
           }
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/\" replace />} />
       </Routes>
       <Toaster position="top-right" />
     </>
