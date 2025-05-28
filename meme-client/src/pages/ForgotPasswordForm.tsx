@@ -31,7 +31,7 @@ export const ForgotPasswordForm: React.FC = () => {
   }
 
   const goToLogin = () => {
-    navigate("/login")
+    navigate("/auth")
   }
 
   return (

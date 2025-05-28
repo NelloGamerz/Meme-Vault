@@ -19,7 +19,7 @@ function App() {
       <Routes>
         <Route path="/forgot-password" element={<ForgotPasswordForm />} />
         <Route path="/reset-password" element={<PasswordResetPage />} />
-        <Route path="/reset-password/:token" element={<PasswordResetPage />} />
+        <Route path="/reset-password/:id" element={<PasswordResetPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/" element={
           <ProtectedRoute>

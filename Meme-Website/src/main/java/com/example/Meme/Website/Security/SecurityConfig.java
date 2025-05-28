@@ -40,6 +40,7 @@ public class SecurityConfig {
                                 "/auth/register",
                                 "/auth/forgot-password",
                                 "/auth/reset-password",
+                                "/reset-password/**",
                                 "/auth/check-username",
                                 "/auth/me",
                                 "/ws/**")

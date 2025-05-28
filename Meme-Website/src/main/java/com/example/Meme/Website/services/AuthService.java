@@ -5,8 +5,10 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -57,6 +59,9 @@ public class AuthService {
     @Autowired
     private CookieUtil cookieUtil;
 
+    @Value("${frontend.url}")
+    private String frontendUrl;
+
 
     @Transactional
     public ResponseEntity<RegisterResponse> registerUser(userModel user) {
@@ -100,7 +105,7 @@ public class AuthService {
             userModel savedUser = userRepository.save(user);
 
             // Token Expiry
-            long accessTokenExpiry = 60; // in minutes
+            long accessTokenExpiry = 1; // in minutes
             long refreshTokenExpiry = 60 * 24 * 7; // in minutes (7 days)
 
             String accessToken = jwtservice.generateToken(savedUser.getUsername(), accessTokenExpiry, "accessToken");
@@ -139,12 +144,11 @@ public class AuthService {
         }
 
         long accessTokenExpiry = 1; // in minutes
-        long refreshTokenExpiry = request.isRememberMe() ? 60 * 24 * 7 : 60 * 24; // in minutes
+        long refreshTokenExpiry = request.isRememberMe() ? 60 * 24 * 7 : 60 * 24; 
 
         String accessToken = jwtservice.generateToken(request.getUsername(), accessTokenExpiry, "accessToken");
         String refreshToken = jwtservice.generateToken(request.getUsername(), refreshTokenExpiry, "refreshToken");
 
-        // Store refresh token in Redis with dynamic key
         redisService.setToken("refresh_token", request.getUsername(), refreshToken, refreshTokenExpiry * 60);
 
         log.info("Authentication successful for username: {}", request.getUsername());
@@ -167,14 +171,28 @@ public class AuthService {
         }
 
         userModel user = userOptional.get();
-        String resetToken = jwtservice.generateToken(user.getUsername(), 15, "accessToken"); // 15-min expiry
+        String passwordResetToken = jwtservice.generateToken(user.getUsername(), 15, "password_reset_token"); // 15-min expiry
+        String resetId = UUID.randomUUID().toString();
 
         log.info("Generated reset token for user: {}", user.getUsername());
 
-        String resetLink = "http://localhost:5173/reset-password?token=" + resetToken;
-        emailService.sendEmail(user.getEmail(), "Password Reset Request",
-                "Click the link below to reset your password:\n" + resetLink +
-                        "\n\nThis link will expire in 15 minutes.");
+        // String redisKey = "reset:" + resetId;
+        redisService.setToken("reset", resetId, passwordResetToken, 15 * 60); // Store in Redis for 15 minutes
+        // redisTemplate.opsForValue().set(redisKey, passwordResetToken, 15, TimeUnit.MINUTES); 
+        log.info("Stored reset token in Redis with key: {}", "reset: "+ resetId);
+
+        // String resetLink = "http://localhost:5173/reset-password?token=" + resetToken;
+        // emailService.sendEmail(user.getEmail(), "Password Reset Request",
+        //         "Click the link below to reset your password:\n" + resetLink +
+        //                 "\n\nThis link will expire in 15 minutes.");
+
+        String resetLink = frontendUrl + "/reset-password/" + resetId;
+        emailService.sendEmail(
+            user.getEmail(),
+            "Password ResetRequest",
+            "Click the link below to reset your password:\n" + resetLink +
+            "\n\nThis link will expire in 15 minutes."
+        );
 
         log.info("Reset email sent to: {}", user.getEmail());
 
@@ -183,10 +201,11 @@ public class AuthService {
 
     @Transactional
     public ResponseEntity<?> resetPassword(PasswordResetRequest request) {
-        String token = request.getToken();
+        String resetId = request.getResetId();
         String newPassword = request.getNewPassword();
 
         log.info("Received password reset request.");
+        String token = redisService.getToken("reset", resetId);
 
         String username = jwtservice.extractUserName(token);
         log.info("Extracted username from token: {}", username);

@@ -125,14 +125,14 @@ const useAuth = () => {
     }
   }
 
-  const resetPassword = async (password: string, token: string) => {
-    if (!token) {
+  const resetPassword = async (password: string, resetId: string) => {
+    if (!resetId) {
       throw new Error("Invalid or expired token")
     }
 
     try {
       const response = await axios.post(`${API_URL}auth/reset-password`, {
-        token,
+        resetId,
         newPassword: password,
       })
 
