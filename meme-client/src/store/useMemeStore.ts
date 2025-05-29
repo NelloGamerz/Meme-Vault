@@ -9,6 +9,7 @@ import type {
   Following,
   ApiFollowers,
   ApiFollowing,
+  Notification
 } from "../types/mems";
 import type { AxiosProgressEvent } from "axios";
 
@@ -29,6 +30,7 @@ interface MemeStore {
   Following: Following[];
   followingCount: number;
   followersCount: number;
+  notifications: Notification[];
   currentPage: "home" | "profile";
   selectedMeme: Meme | null;
   isLoading: boolean;
@@ -73,6 +75,10 @@ interface MemeStore {
   joinPostSession: (memeId: string) => void;
   leavePostSession: (memeId: string) => void;
   wsClient: WebSocket | null;
+  addNotification: (notification: Notification) => void;
+  markNotificationAsRead: (notificationId: string) => void;
+  clearNotifications: () => void;
+  fetchNotifications: (userId: string) => Promise<void>;
 }
 
 const mapApiMemeToMeme = (apiMeme: ApiMeme): Meme => ({
@@ -123,7 +129,6 @@ const setInLocalStorage = (key: string, value: unknown): void => {
   }
 };
 
-// const WS_URL = "ws://localhost:8080/ws";
 const WS_URL = import.meta.env.VITE_WEBSOCKET_URL
 
 export const useMemeStore = create<MemeStore>((set, get) => ({
@@ -135,6 +140,7 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
   Following: [],
   followersCount: 0,
   followingCount: 0,
+  notifications: [],
   currentPage: "home",
   selectedMeme: null,
   isLoading: false,
@@ -145,6 +151,35 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
   userName: "",
   userCreated: new Date(),
   wsClient: null,
+
+  addNotification: (notification) => {
+    set((state) => ({
+      notifications: [notification, ...state.notifications]
+    }));
+  },
+
+  markNotificationAsRead: (notificationId) => {
+    set((state) => ({
+      notifications: state.notifications.map(notification =>
+        notification.id === notificationId
+          ? { ...notification, read: true }
+          : notification
+      )
+    }));
+  },
+
+  clearNotifications: () => {
+    set({ notifications: [] });
+  },
+
+  fetchNotifications: async (userId) => {
+    try {
+      const response = await api.get(`/notifications/${userId}`);
+      set({ notifications: response.data });
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  },
 
   connectWebSocket: () => {
     if (wsClient && wsClient.readyState === WebSocket.OPEN) return;
@@ -166,101 +201,123 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
     wsClient.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "COMMENT" && data.memeId) {
-          const newComment = {
-            id: data.id,
-            memeId: data.memeId,
-            userId: data.userId,
-            text: data.text,
-            username: data.username,
-            createdAt: data.createdAt,
-            profilePictureUrl: data.profilePictureUrl,
-          };
+        
+        switch (data.type) {
+          case "NOTIFICATION":
+            get().addNotification(data.notification);
+            break;
+          case "COMMENT":
+            if (data.memeId) {
+              const newComment = {
+                id: data.id,
+                memeId: data.memeId,
+                userId: data.userId,
+                text: data.text,
+                username: data.username,
+                createdAt: data.createdAt,
+                profilePictureUrl: data.profilePictureUrl,
+              };
 
-          set((state) => {
-            const updateMemeInArray = (memes: Meme[]): Meme[] =>
-              memes.map((meme) =>
-                meme.id === data.memeId
-                  ? {
-                      ...meme,
-                      comments: [...(meme.comments || []), newComment],
-                    }
-                  : meme
-              );
-            return {
-              memes: updateMemeInArray(state.memes),
-              userMemes: updateMemeInArray(state.userMemes),
-              likedMemes: updateMemeInArray(state.likedMemes),
-              savedMemes: updateMemeInArray(state.savedMemes),
-            };
-          });
-        }
-
-        if (data.type === "LIKE" && data.memeId) {
-          set((state) => {
-            const updateLikeCount = (arr: Meme[]) =>
-              arr.map((meme) =>
-                meme.id === data.memeId
-                  ? { ...meme, likeCount: data.likeCount }
-                  : meme
-              );
-
-            let likedMemes = state.likedMemes;
-            const user = getUserFromLocalStorage();
-            if (data.likedUserIds && user.username) {
-              const memeObj =
-                state.memes.find((m) => m.id === data.memeId) ||
-                state.userMemes.find((m) => m.id === data.memeId) ||
-                state.savedMemes.find((m) => m.id === data.memeId);
-              likedMemes = data.likedUserIds.includes(user.username)
-                ? memeObj
-                  ? [
-                      ...state.likedMemes.filter((m) => m.id !== data.memeId),
-                      memeObj,
-                    ]
-                  : state.likedMemes
-                : state.likedMemes.filter((m) => m.id !== data.memeId);
+              set((state) => {
+                const updateMemeInArray = (memes: Meme[]): Meme[] =>
+                  memes.map((meme) =>
+                    meme.id === data.memeId
+                      ? {
+                          ...meme,
+                          comments: [...(meme.comments || []), newComment],
+                        }
+                      : meme
+                  );
+                return {
+                  memes: updateMemeInArray(state.memes),
+                  userMemes: updateMemeInArray(state.userMemes),
+                  likedMemes: updateMemeInArray(state.likedMemes),
+                  savedMemes: updateMemeInArray(state.savedMemes),
+                };
+              });
             }
+            break;
+          case "LIKE":
+            if (data.memeId) {
+              set((state) => {
+                const updateLikeCount = (arr: Meme[]) =>
+                  arr.map((meme) =>
+                    meme.id === data.memeId
+                      ? { ...meme, likeCount: data.likeCount }
+                      : meme
+                  );
 
-            return {
-              memes: updateLikeCount(state.memes),
-              userMemes: updateLikeCount(state.userMemes),
-              savedMemes: updateLikeCount(state.savedMemes),
-              likedMemes,
-            };
-          });
-        }
+                let likedMemes = state.likedMemes;
+                const user = getUserFromLocalStorage();
+                if (data.likedUserIds && user.username) {
+                  const memeObj =
+                    state.memes.find((m) => m.id === data.memeId) ||
+                    state.userMemes.find((m) => m.id === data.memeId) ||
+                    state.savedMemes.find((m) => m.id === data.memeId);
+                  likedMemes = data.likedUserIds.includes(user.username)
+                    ? memeObj
+                      ? [
+                          ...state.likedMemes.filter((m) => m.id !== data.memeId),
+                          memeObj,
+                        ]
+                      : state.likedMemes
+                    : state.likedMemes.filter((m) => m.id !== data.memeId);
+                }
 
-        if (data.type === "SAVE" && data.memeId) {
-          set((state) => {
-            const updateSaveCount = (arr: Meme[]) =>
-              arr.map((meme) =>
-                meme.id === data.memeId
-                  ? { ...meme, saveCount: data.saveCount }
-                  : meme
-              );
-
-            let savedMemes = state.savedMemes;
-            const user = getUserFromLocalStorage();
-            if (data.savedUserIds && user.username) {
-              const memeObj = state.memes.find((m) => m.id === data.memeId);
-              savedMemes = data.savedUserIds.includes(user.username)
-                ? memeObj
-                  ? [
-                      ...state.savedMemes.filter((m) => m.id !== data.memeId),
-                      memeObj,
-                    ]
-                  : state.savedMemes
-                : state.savedMemes.filter((m) => m.id !== data.memeId);
+                return {
+                  memes: updateLikeCount(state.memes),
+                  userMemes: updateLikeCount(state.userMemes),
+                  savedMemes: updateLikeCount(state.savedMemes),
+                  likedMemes,
+                };
+              });
             }
+            break;
+          case "SAVE":
+            if (data.memeId) {
+              set((state) => {
+                const updateSaveCount = (arr: Meme[]) =>
+                  arr.map((meme) =>
+                    meme.id === data.memeId
+                      ? { ...meme, saveCount: data.saveCount }
+                      : meme
+                  );
 
-            return {
-              memes: updateSaveCount(state.memes),
-              userMemes: updateSaveCount(state.userMemes),
-              likedMemes: updateSaveCount(state.likedMemes),
-              savedMemes,
-            };
-          });
+                let savedMemes = state.savedMemes;
+                const user = getUserFromLocalStorage();
+                if (data.savedUserIds && user.username) {
+                  const memeObj = state.memes.find((m) => m.id === data.memeId);
+                  savedMemes = data.savedUserIds.includes(user.username)
+                    ? memeObj
+                      ? [
+                          ...state.savedMemes.filter((m) => m.id !== data.memeId),
+                          memeObj,
+                        ]
+                      : state.savedMemes
+                    : state.savedMemes.filter((m) => m.id !== data.memeId);
+                }
+
+                return {
+                  memes: updateSaveCount(state.memes),
+                  userMemes: updateSaveCount(state.userMemes),
+                  likedMemes: updateSaveCount(state.likedMemes),
+                  savedMemes,
+                };
+              });
+            }
+            break;
+          case "FOLLOW":
+            get().addNotification({
+              id: data.id,
+              type: "FOLLOW",
+              message: `${data.followerUsername} started following you`,
+              timestamp: new Date().toISOString(),
+              read: false,
+              userId: data.userId,
+              triggeredBy: data.followerUsername,
+              profilePictureUrl: data.profilePictureUrl
+            });
+            break;
         }
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
