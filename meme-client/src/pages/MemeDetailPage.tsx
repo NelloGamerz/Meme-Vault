@@ -70,7 +70,7 @@ const MemeDetailPage: React.FC = () => {
         joinPostSession(id);
         await fetchMemeById(id);
         if (user.userId) {
-          await fetchUserProfile(user.userId);
+          await fetchUserProfile(user.username);
         }
       }
     };
@@ -197,9 +197,9 @@ const MemeDetailPage: React.FC = () => {
   const openCommentModal = () => setIsCommentModalOpen(true);
   const closeCommentModal = () => setIsCommentModalOpen(false);
 
-  const navigateToProfile = (userId: string) => {
-    navigate(`/profile/${userId}`);
-    fetchUserProfile(userId);
+  const navigateToProfile = (username: string) => {
+    navigate(`/profile/${username}`);
+    fetchUserProfile(username);
   };
 
   const sortedComments = meme.comments
@@ -294,7 +294,7 @@ const MemeDetailPage: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 text-sm">
                   <button
-                    onClick={() => navigateToProfile(meme.userId)}
+                    onClick={() => navigateToProfile(meme.uploader)}
                     className="flex items-center space-x-2 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
                   >
                     {meme.profilePictureUrl ? (
@@ -415,7 +415,7 @@ const MemeDetailPage: React.FC = () => {
                       >
                         <div className="flex items-center justify-between mb-1">
                           <button
-                            onClick={() => navigateToProfile(comment.userId)}
+                            onClick={() => navigateToProfile(comment.username)}
                             className="flex items-center space-x-2 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
                           >
                             {comment.profilePictureUrl ? (
@@ -504,7 +504,7 @@ const MemeDetailPage: React.FC = () => {
                       className="flex items-start space-x-3 pb-4 border-b dark:border-gray-700 last:border-0"
                     >
                       <button
-                        onClick={() => navigateToProfile(comment.userId)}
+                        onClick={() => navigateToProfile(comment.username)}
                         className="flex items-start space-x-3 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
                       >
                         {comment.profilePictureUrl ? (
@@ -522,7 +522,7 @@ const MemeDetailPage: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-baseline justify-between mb-1">
                           <button
-                            onClick={() => navigateToProfile(comment.userId)}
+                            onClick={() => navigateToProfile(comment.username)}
                             className="font-medium text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
                           >
                             {comment.username}

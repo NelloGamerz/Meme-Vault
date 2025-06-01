@@ -4,11 +4,12 @@ import type {
   Meme,
   ApiMeme,
   Comment,
-  User,
   Followers,
   Following,
   ApiFollowers,
   ApiFollowing,
+  Notification,
+  // ApiNotifications,
 } from "../types/mems";
 import type { AxiosProgressEvent } from "axios";
 
@@ -24,9 +25,12 @@ interface MemeStore {
   likedMemes: Meme[];
   profilePictureUrl: string;
   userName: string;
+  viewedProfilePictureUrl: string;
+  viewedUserName: string;
   savedMemes: Meme[];
   Followers: Followers[];
   Following: Following[];
+  notifications: Notification[];
   followingCount: number;
   followersCount: number;
   currentPage: "home" | "profile";
@@ -42,7 +46,7 @@ interface MemeStore {
   fetchUserMemes: (username: string) => Promise<void>;
   fetchLikedMemes: (username: string) => Promise<void>;
   fetchSavedMemes: (username: string) => Promise<void>;
-  fetchUserProfile: (userId: string) => Promise<void>;
+  fetchUserProfile: (username: string) => Promise<void>;
   toggleLike: (id: string, username: string) => Promise<void>;
   toggleSave: (id: string, username: string) => Promise<void>;
   setPage: (page: "home" | "profile") => void;
@@ -73,6 +77,8 @@ interface MemeStore {
   joinPostSession: (memeId: string) => void;
   leavePostSession: (memeId: string) => void;
   wsClient: WebSocket | null;
+  getNotifications: (username : string) => void;
+  addNotification: (notification: Partial<Notification>) => void;
 }
 
 const mapApiMemeToMeme = (apiMeme: ApiMeme): Meme => ({
@@ -124,7 +130,7 @@ const setInLocalStorage = (key: string, value: unknown): void => {
 };
 
 // const WS_URL = "ws://localhost:8080/ws";
-const WS_URL = import.meta.env.VITE_WEBSOCKET_URL
+const WS_URL = import.meta.env.VITE_WEBSOCKET_URL;
 
 export const useMemeStore = create<MemeStore>((set, get) => ({
   memes: [],
@@ -133,6 +139,7 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
   savedMemes: [],
   Followers: [],
   Following: [],
+  notifications: [],
   followersCount: 0,
   followingCount: 0,
   currentPage: "home",
@@ -142,22 +149,34 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
   uploadProgress: null,
   searchQuery: "",
   profilePictureUrl: "",
-  userName: "",
+  userName: getUserFromLocalStorage().username || "",
+  viewedProfilePictureUrl: "",
+  viewedUserName: "",
   userCreated: new Date(),
   wsClient: null,
 
   connectWebSocket: () => {
     if (wsClient && wsClient.readyState === WebSocket.OPEN) return;
 
-    wsClient = new WebSocket(WS_URL);
-    console.log("Connecting to WebSocket:", WS_URL);
+    // Get user info for connection
+    const user = getUserFromLocalStorage();
+    if (!user || !user.userId) {
+      console.error("Cannot connect WebSocket: No user found in localStorage");
+      return;
+    }
+
+    // Use the userId as a query parameter for authentication
+    const wsUrlWithAuth = `${WS_URL}?userId=${user.userId}`;
+    wsClient = new WebSocket(wsUrlWithAuth);
+    console.log("Connecting to WebSocket:", wsUrlWithAuth);
 
     wsClient.onopen = () => {
+      console.log("WebSocket connection established successfully");
       set({ wsClient });
-      if(lastJoinedPostId){
+      if (lastJoinedPostId) {
         get().joinPostSession(lastJoinedPostId);
       }
-      if(reconnectTimeout){
+      if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
         reconnectTimeout = null;
       }
@@ -166,6 +185,13 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
     wsClient.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        
+        // Skip processing ping/pong messages
+        if (data.type === 'PONG' || data.type === 'PING') {
+          return;
+        }
+        
+        console.log("WebSocket message received:", data);
         if (data.type === "COMMENT" && data.memeId) {
           const newComment = {
             id: data.id,
@@ -262,36 +288,217 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
             };
           });
         }
+
+        if (data.type === "FOLLOW") {
+          const user = getUserFromLocalStorage();
+          console.log("WebSocket FOLLOW event received:", data);
+          console.log("Current user:", user);
+          console.log("Current viewedUserName:", get().viewedUserName);
+
+          // Update followers and following counts
+          if (data.followingUsername === user.username) {
+            // Someone followed/unfollowed the current user
+            // data.isFollowing is the new state - true means they are now following, false means they unfollowed
+            console.log("Someone followed/unfollowed the current user:", data.followerUsername);
+            console.log("New follow state:", data.isFollowing);
+            
+            set((state) => {
+              // Check if we're viewing the profile of the user who just followed/unfollowed us
+              const isViewingFollowerProfile = data.followerUsername === state.viewedUserName;
+              console.log("Is viewing follower profile:", isViewingFollowerProfile);
+              
+              // If we're viewing the profile of the user who just followed/unfollowed us,
+              // we need to update the following count and list
+              // const newFollowingCount = isViewingFollowerProfile
+              //   ? (data.isFollowing
+              //       ? state.followingCount + 1
+              //       : Math.max(0, state.followingCount - 1))
+              //   : state.followingCount;
+              
+              // Update the Following list if we're viewing the profile of the user who just followed/unfollowed us
+              const updatedFollowing = isViewingFollowerProfile
+                ? (data.isFollowing
+                    ? [
+                        ...state.Following.filter(
+                          (f) => f.userId !== data.followerId
+                        ),
+                        {
+                          userId: data.followerId,
+                          username: data.followerUsername,
+                          profilePictureUrl: data.profilePictureUrl || "",
+                          isFollow: data.isFollowing,
+                        },
+                      ]
+                    : state.Following.filter(
+                        (f) => f.userId !== data.followerId
+                      ))
+                : state.Following;
+              
+              const newState = {
+                // Only update the followers count, not the following count
+                followersCount: data.isFollowing
+                  ? state.followersCount + 1
+                  : Math.max(0, state.followersCount - 1),
+                Followers: data.isFollowing
+                  ? [
+                      ...state.Followers.filter(
+                        (f) => f.userId !== data.followerId
+                      ),
+                      {
+                        userId: data.followerId,
+                        username: data.followerUsername,
+                        profilePictureUrl: data.profilePictureUrl || "",
+                        isFollow: data.isFollowing, // Use the actual follow state from the message
+                      },
+                    ]
+                  : state.Followers.filter(
+                      (f) => f.userId !== data.followerId
+                    ),
+                Following: updatedFollowing,
+              };
+              
+              console.log("Updated state for someone following current user:", newState);
+              return newState;
+            });
+          }
+
+          if (data.followerUsername === user.username) {
+            // Current user followed/unfollowed someone
+            // data.isFollowing is the new state - true means current user is now following, false means unfollowed
+            console.log("Current user followed/unfollowed someone:", data.followingUsername);
+            console.log("New follow state:", data.isFollowing);
+            
+            set((state) => {
+              // Check if we're viewing the profile of the user we just followed/unfollowed
+              const isViewingFollowedProfile = data.followingUsername === state.viewedUserName;
+              console.log("Is viewing followed profile:", isViewingFollowedProfile);
+              
+              // If we're viewing the profile of the user we just followed/unfollowed,
+              // we need to update the followers count and list
+              const newFollowersCount = isViewingFollowedProfile
+                ? (data.isFollowing
+                    ? state.followersCount + 1
+                    : Math.max(0, state.followersCount - 1))
+                : state.followersCount;
+              
+              // Update the Followers list if we're viewing the profile of the user we just followed/unfollowed
+              const updatedFollowers = isViewingFollowedProfile
+                ? (data.isFollowing
+                    ? [
+                        ...state.Followers.filter(
+                          (f) => f.userId !== user.userId
+                        ),
+                        {
+                          userId: user.userId,
+                          username: user.username,
+                          profilePictureUrl: user.profilePicture || "",
+                          isFollow: data.isFollowing,
+                        },
+                      ]
+                    : state.Followers.filter(
+                        (f) => f.userId !== user.userId
+                      ))
+                : state.Followers;
+              
+              const newState = {
+                // Only update the followers count, not the following count
+                followersCount: newFollowersCount,
+                Following: data.isFollowing
+                  ? [
+                      ...state.Following.filter(
+                        (f) => f.userId !== data.followingId
+                      ),
+                      {
+                        userId: data.followingId || "",
+                        username: data.followingUsername,
+                        profilePictureUrl: data.profilePictureUrl || "",
+                        isFollow: data.isFollowing, // Use the actual follow state from the message
+                      },
+                    ]
+                  : state.Following.filter(
+                      (f) => f.userId !== data.followingId
+                    ),
+                Followers: updatedFollowers,
+                isFollowing: isViewingFollowedProfile
+                  ? data.isFollowing  // Update isFollowing based on the viewed profile
+                  : state.isFollowing,
+              };
+              
+              console.log("Updated state for current user following someone:", newState);
+              return newState;
+            });
+          }
+          
+          // Log the current state for debugging
+          console.log("Current state after WebSocket FOLLOW event:", {
+            followersCount: get().followersCount,
+            followingCount: get().followingCount,
+            isFollowing: get().isFollowing,
+            Followers: get().Followers.length,
+            Following: get().Following.length
+          });
+        }
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }
     };
 
-    wsClient.onclose = () => {
+    wsClient.onclose = (event) => {
+      console.log(`WebSocket connection closed with code: ${event.code}`);
       wsClient = null;
       set({ wsClient: null });
-      if(!reconnectTimeout){
-        reconnectTimeout = setTimeout(() =>{
+      
+      // Always attempt to reconnect unless it was a normal closure (code 1000)
+      if (event.code !== 1000) {
+        // Set up reconnection with a fixed delay
+        const reconnectDelay = 2000; // 2 seconds
+        console.log(`Scheduling reconnect in ${reconnectDelay}ms`);
+        
+        // Clear any existing timeout
+        if (reconnectTimeout) {
+          clearTimeout(reconnectTimeout);
+        }
+        
+        reconnectTimeout = setTimeout(() => {
+          console.log("Attempting to reconnect WebSocket...");
+          reconnectTimeout = null;
           get().connectWebSocket();
-        }, 2000);
+        }, reconnectDelay);
       }
     };
 
     wsClient.onerror = (err) => {
       console.error("WebSocket error", err);
-      wsClient?.close();
+      // Don't close here, let the onclose handler deal with reconnection
     };
   },
 
   disconnectWebSocket: () => {
+    // Clear any reconnection attempts
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+    
     if (wsClient) {
       if (currentMemeId) {
-        wsClient.send(
-          JSON.stringify({ type: "leavePost", postId: currentMemeId })
-        );
+        try {
+          wsClient.send(
+            JSON.stringify({ type: "leavePost", postId: currentMemeId })
+          );
+        } catch (error) {
+          console.error("Error sending leavePost message:", error);
+        }
         currentMemeId = null;
       }
-      wsClient.close();
+      
+      try {
+        // Use code 1000 for normal closure
+        wsClient.close(1000, "User logged out");
+      } catch (error) {
+        console.error("Error closing WebSocket:", error);
+      }
+      
       wsClient = null;
       set({ wsClient: null });
     }
@@ -461,87 +668,202 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
     }
   },
 
-  fetchUserProfile: async (userId: string) => {
-    set({ isLoading: true, error: null });
+  // fetchUserProfile: async (userId: string) => {
+  //   set({ isLoading: true, error: null });
 
-    try {
-      const response = await api.get<{
-        profilePictureUrl: string;
-        savedMemes: ApiMeme[];
-        followers: Followers[];
-        memeList: ApiMeme[];
-        likedMemes: ApiMeme[];
-        following: Following[];
-        followersCount: number;
-        followingCount: number;
-        username: string;
-        userId: string;
-        userCreated: string;
-      }>(`/profile/${userId}`);
+  //   try {
+  //     const response = await api.get<{
+  //       profilePictureUrl: string;
+  //       savedMemes: ApiMeme[];
+  //       followers: Followers[];
+  //       memeList: ApiMeme[];
+  //       likedMemes: ApiMeme[];
+  //       following: Following[];
+  //       followersCount: number;
+  //       followingCount: number;
+  //       username: string;
+  //       userId: string;
+  //       userCreated: string;
+  //     }>(`/profile/${userId}`);
 
-      const data = response.data;
+  //     const data = response.data;
 
-      const mapToMeme = (memes: ApiMeme[]): Meme[] =>
-        memes.map((meme) => ({
-          id: meme.id,
-          url: meme.mediaUrl,
-          title: meme.caption,
-          uploader: meme.uploader,
-          likeCount: meme.likecount,
-          saveCount: meme.saveCount,
-          createdAt: meme.memeCreated ? new Date(meme.memeCreated) : new Date(),
-          comments: meme.comments || [],
-          profilePictureUrl: meme.profilePictureUrl,
-          userId: meme.userId,
-        }));
+  //     const mapToMeme = (memes: ApiMeme[]): Meme[] =>
+  //       memes.map((meme) => ({
+  //         id: meme.id,
+  //         url: meme.mediaUrl,
+  //         title: meme.caption,
+  //         uploader: meme.uploader,
+  //         likeCount: meme.likecount,
+  //         saveCount: meme.saveCount,
+  //         createdAt: meme.memeCreated ? new Date(meme.memeCreated) : new Date(),
+  //         comments: meme.comments || [],
+  //         profilePictureUrl: meme.profilePictureUrl,
+  //         userId: meme.userId,
+  //       }));
 
-      const mapToFollowers = (followers: ApiFollowers[]): Followers[] =>
-        followers.map((follower) => ({
-          userId: follower.userId,
-          username: follower.username || "",
-          profilePictureUrl: follower.profilePictureUrl || "",
-          isFollow: follower.isFollow,
-        }));
+  //     const mapToFollowers = (followers: ApiFollowers[]): Followers[] =>
+  //       followers.map((follower) => ({
+  //         userId: follower.userId,
+  //         username: follower.username || "",
+  //         profilePictureUrl: follower.profilePictureUrl || "",
+  //         isFollow: follower.isFollow,
+  //       }));
 
-      const mapToFollowing = (following: ApiFollowing[]): Following[] =>
-        following.map((followingUser) => ({
-          userId: followingUser.userId,
-          username: followingUser.username || "",
-          profilePictureUrl: followingUser.profilePictureUrl || "",
-          isFollow: followingUser.isFollow,
-        }));
+  //     const mapToFollowing = (following: ApiFollowing[]): Following[] =>
+  //       following.map((followingUser) => ({
+  //         userId: followingUser.userId,
+  //         username: followingUser.username || "",
+  //         profilePictureUrl: followingUser.profilePictureUrl || "",
+  //         isFollow: followingUser.isFollow,
+  //       }));
 
-      const mapToUser = (userData: {
-        userId: string;
-        username: string;
-        profilePictureUrl: string;
-        followersCount: number;
-        followingCount: number;
-        userCreated: string;
-        followers: Followers[];
-        following: Following[];
-      }): User => ({
-        userId: userData.userId,
-        username: userData.username || "",
-        profilePictureUrl: userData.profilePictureUrl || "",
-        followersCount: userData.followersCount || 0,
-        followingCount: userData.followingCount || 0,
-        userCreated: new Date(userData.userCreated),
-        followers: mapToFollowers(userData.followers),
-        following: mapToFollowing(userData.following),
-        memeList: [],
-        likedMeme: [],
-        savedMeme: [],
-      });
+  //     const mapToUser = (userData: {
+  //       userId: string;
+  //       username: string;
+  //       profilePictureUrl: string;
+  //       followersCount: number;
+  //       followingCount: number;
+  //       userCreated: string;
+  //       followers: Followers[];
+  //       following: Following[];
+  //     }): User => ({
+  //       userId: userData.userId,
+  //       username: userData.username || "",
+  //       profilePictureUrl: userData.profilePictureUrl || "",
+  //       followersCount: userData.followersCount || 0,
+  //       followingCount: userData.followingCount || 0,
+  //       userCreated: new Date(userData.userCreated),
+  //       followers: mapToFollowers(userData.followers),
+  //       following: mapToFollowing(userData.following),
+  //       memeList: [],
+  //       likedMeme: [],
+  //       savedMeme: [],
+  //     });
 
-      const userProfile = mapToUser(data);
-      const userMemes = mapToMeme(data.memeList || []);
-      const likedMemes = mapToMeme(data.likedMemes || []);
-      const savedMemes = mapToMeme(data.savedMemes || []);
+  //     const userProfile = mapToUser(data);
+  //     const userMemes = mapToMeme(data.memeList || []);
+  //     const likedMemes = mapToMeme(data.likedMemes || []);
+  //     const savedMemes = mapToMeme(data.savedMemes || []);
 
+  //     // Get the logged-in user from localStorage
+  //     const loggedInUser = getUserFromLocalStorage();
+
+  //     // Always set the viewed profile information based on the requested userId
+  //     set({
+  //       viewedUserName: userProfile.username,
+  //       viewedProfilePictureUrl: userProfile.profilePictureUrl,
+  //     });
+
+  //     // Only update the global userName and profilePictureUrl if viewing own profile
+  //     if (userId === loggedInUser.userId) {
+  //       set({
+  //         userName: userProfile.username,
+  //         profilePictureUrl: userProfile.profilePictureUrl,
+  //         userCreated: userProfile.userCreated,
+  //       });
+  //     }
+
+  //     // Always update these fields regardless of whose profile is being viewed
+  //     set({
+  //       Followers: userProfile.followers,
+  //       Following: userProfile.following,
+  //       followersCount: userProfile.followersCount,
+  //       followingCount: userProfile.followingCount,
+  //       userMemes,
+  //       likedMemes,
+  //       savedMemes,
+  //     });
+  //   } catch (error) {
+  //     set({
+  //       error: "Failed to fetch user data",
+  //       userMemes: [],
+  //       likedMemes: [],
+  //       savedMemes: [],
+  //     });
+  //     console.error("Error fetching user data:", error);
+  //   } finally {
+  //     set({ isLoading: false });
+  //   }
+  // },
+
+
+  fetchUserProfile: async (username: string) => {
+  set({ isLoading: true, error: null });
+
+  try {
+    const response = await api.get<{
+      profilePictureUrl: string;
+      savedMemes: ApiMeme[];
+      followers: Followers[];
+      memeList: ApiMeme[];
+      likedMemes: ApiMeme[];
+      following: Following[];
+      followersCount: number;
+      followingCount: number;
+      username: string;
+      userId: string;
+      userCreated: string;
+    }>(`/profile/${username}`);
+
+    const data = response.data;
+    const loggedInUser = getUserFromLocalStorage();
+    const isOwnProfile = username === loggedInUser.username;
+
+    // Map the data as before...
+    const mapToMeme = (memes: ApiMeme[]): Meme[] =>
+      memes.map((meme) => ({
+        id: meme.id,
+        url: meme.mediaUrl,
+        title: meme.caption,
+        uploader: meme.uploader,
+        likeCount: meme.likecount,
+        saveCount: meme.saveCount,
+        createdAt: meme.memeCreated ? new Date(meme.memeCreated) : new Date(),
+        comments: meme.comments || [],
+        profilePictureUrl: meme.profilePictureUrl,
+        userId: meme.userId,
+      }));
+
+    const mapToFollowers = (followers: ApiFollowers[]): Followers[] =>
+      followers.map((follower) => ({
+        userId: follower.userId,
+        username: follower.username || "",
+        profilePictureUrl: follower.profilePictureUrl || "",
+        isFollow: follower.isFollow,
+      }));
+
+    const mapToFollowing = (following: ApiFollowing[]): Following[] =>
+      following.map((followingUser) => ({
+        userId: followingUser.userId,
+        username: followingUser.username || "",
+        profilePictureUrl: followingUser.profilePictureUrl || "",
+        isFollow: followingUser.isFollow,
+      }));
+
+    const userProfile = {
+      userId: data.userId,
+      username: data.username || "",
+      profilePictureUrl: data.profilePictureUrl || "",
+      followersCount: data.followersCount || 0,
+      followingCount: data.followingCount || 0,
+      userCreated: new Date(data.userCreated),
+      followers: mapToFollowers(data.followers),
+      following: mapToFollowing(data.following),
+    };
+
+    const userMemes = mapToMeme(data.memeList || []);
+    const likedMemes = mapToMeme(data.likedMemes || []);
+    const savedMemes = mapToMeme(data.savedMemes || []);
+
+    // Update state based on whether this is the user's own profile or not
+    if (isOwnProfile) {
+      // Update both viewed and own profile info when viewing own profile
       set({
         userName: userProfile.username,
         profilePictureUrl: userProfile.profilePictureUrl,
+        viewedUserName: userProfile.username,
+        viewedProfilePictureUrl: userProfile.profilePictureUrl,
         userCreated: userProfile.userCreated,
         Followers: userProfile.followers,
         Following: userProfile.following,
@@ -551,18 +873,40 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
         likedMemes,
         savedMemes,
       });
-    } catch (error) {
+    } else {
+      // Only update viewed profile info when viewing someone else's profile
       set({
-        error: "Failed to fetch user data",
-        userMemes: [],
-        likedMemes: [],
-        savedMemes: [],
+        viewedUserName: userProfile.username,
+        viewedProfilePictureUrl: userProfile.profilePictureUrl,
+        Followers: userProfile.followers,
+        Following: userProfile.following,
+        followersCount: userProfile.followersCount,
+        followingCount: userProfile.followingCount,
+        userMemes,
+        // Don't update likedMemes and savedMemes when viewing other profiles
+        ...(isOwnProfile ? { likedMemes, savedMemes } : {}),
       });
-      console.error("Error fetching user data:", error);
-    } finally {
-      set({ isLoading: false });
     }
-  },
+
+    // Set the isFollowing state
+    const isFollowing = userProfile.followers.some(
+      follower => follower.userId === loggedInUser.userId
+    );
+    set({ isFollowing });
+
+  } catch (error) {
+    set({
+      error: "Failed to fetch user data",
+      userMemes: [],
+      likedMemes: [],
+      savedMemes: [],
+    });
+    console.error("Error fetching user data:", error);
+  } finally {
+    set({ isLoading: false });
+  }
+},
+
 
   uploadMeme: async (file: File, title: string, profilePictureUrl: string) => {
     const user = getUserFromLocalStorage();
@@ -616,7 +960,7 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
       }));
 
       if (user.userId) {
-        await get().fetchUserProfile(user.userId);
+        await get().fetchUserProfile(user.username);
       }
     } catch (error) {
       set({ error: "Failed to delete meme" });
@@ -834,7 +1178,6 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
 
         removeFromLocalStorage("token");
         setInLocalStorage("token", newToken);
-
       }
     } catch (error) {
       set({ error: "Failed to update username" });
@@ -844,17 +1187,169 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
     }
   },
 
-  handleFollowToggle: async (followingUser: string, isFollowing: boolean) => {
+  handleFollowToggle: async (followingUsername: string, isFollowing: boolean) => {
     const loggedInUser = getUserFromLocalStorage();
     set({ isLoading: true, error: null });
 
     try {
-      await api.post(
-        `/profile/${loggedInUser.userId}/follow/${followingUser}`,
-        {
-          isFollowing: isFollowing,
+      // Get the username and profile picture of the user being followed/unfollowed
+      const followingUsername = get().viewedUserName;
+      const followingProfilePicture = get().viewedProfilePictureUrl;
+      
+      console.log("handleFollowToggle - Current user:", loggedInUser.username);
+      console.log("handleFollowToggle - Following user:", followingUsername);
+      console.log("handleFollowToggle - Current follow state:", isFollowing);
+      
+      // The isFollowing parameter indicates the current state
+      // If isFollowing is true, user is already following and wants to unfollow
+      // If isFollowing is false, user is not following and wants to follow
+      // We need to NEGATE the current state to get the desired new state
+      const newFollowState = !isFollowing;
+      
+      console.log("handleFollowToggle - New follow state to send:", newFollowState);
+
+      // Create the WebSocket message
+      const followMessage = {
+        type: "FOLLOW",
+        followerId: loggedInUser.userId,
+        followerUsername: loggedInUser.username,
+        // followingId: followingUserId,
+        followingUsername: followingUsername,
+        isFollowing: newFollowState, // Use the new follow state
+        profilePictureUrl: loggedInUser.profilePicture || "",
+        followingProfilePictureUrl: followingProfilePicture || "",
+      };
+
+      // Use the existing WebSocket connection from useMemeStore
+      if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+        wsClient.send(JSON.stringify(followMessage));
+        console.log("WebSocket message sent:", followMessage);
+
+        // Optimistically update the UI state
+        if (followingUsername) {
+          set((state) => {
+            console.log("Optimistically updating UI state - WebSocket open");
+            
+            // Update the Followers list if the current user is following the viewed profile
+            const updatedFollowers = newFollowState
+              ? [
+                  ...state.Followers.filter(
+                    (f) => f.userId !== loggedInUser.userId
+                  ),
+                  {
+                    userId: loggedInUser.userId,
+                    username: loggedInUser.username,
+                    profilePictureUrl: loggedInUser.profilePicture || "",
+                    isFollow: newFollowState, // Use the actual follow state
+                  },
+                ]
+              : state.Followers.filter((f) => f.userId !== loggedInUser.userId);
+            
+            // Update the Following list if the current user is following the viewed profile
+            const updatedFollowing = newFollowState
+              ? [
+                  ...state.Following.filter(
+                    (f) => f.username !== followingUsername
+                  ),
+                  {
+                    // userId: followingUserId,
+                    username: followingUsername,
+                    profilePictureUrl: get().viewedProfilePictureUrl || "",
+                    isFollow: newFollowState, // Use the actual follow state
+                  },
+                ]
+              : state.Following.filter((f) => f.username !== followingUsername);
+            
+            // We're only updating the followers count of the viewed profile, not our own following count
+            // When we follow someone, we increment their followers count
+            // When we unfollow someone, we decrement their followers count
+            const newFollowersCount = newFollowState
+              ? state.followersCount + 1  // We're following, so increment the follower count
+              : Math.max(0, state.followersCount - 1);  // We're unfollowing, so decrement the follower count
+            
+            console.log("Optimistic UI update - Old follower count:", state.followersCount);
+            console.log("Optimistic UI update - New follower count:", newFollowersCount);
+            
+            return {
+              // Only update the followers count, not the following count
+              followersCount: newFollowersCount,
+              Following: updatedFollowing,
+              Followers: updatedFollowers,
+              isFollowing: newFollowState,
+            };
+          });
         }
-      );
+      } else {
+        // If WebSocket is not connected, try to connect and then send
+        console.log("WebSocket not connected, attempting to connect...");
+        get().connectWebSocket();
+        setTimeout(() => {
+          if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+            wsClient.send(JSON.stringify(followMessage));
+            console.log("WebSocket message sent after reconnect:", followMessage);
+
+            // Optimistically update the UI state
+            if (followingUsername) {
+              set((state) => {
+                console.log("Optimistically updating UI state - after reconnect");
+                
+                // Update the Followers list if the current user is following the viewed profile
+                const updatedFollowers = newFollowState
+                  ? [
+                      ...state.Followers.filter(
+                        (f) => f.userId !== loggedInUser.userId
+                      ),
+                      {
+                        userId: loggedInUser.userId,
+                        username: loggedInUser.username,
+                        profilePictureUrl: loggedInUser.profilePicture || "",
+                        isFollow: newFollowState, // Use the actual follow state
+                      },
+                    ]
+                  : state.Followers.filter((f) => f.userId !== loggedInUser.userId);
+                
+                // Update the Following list if the current user is following the viewed profile
+                const updatedFollowing = newFollowState
+                  ? [
+                      ...state.Following.filter(
+                        (f) => f.username !== followingUsername
+                      ),
+                      {
+                        // userId: followingUserId,
+                        username: followingUsername,
+                        profilePictureUrl: get().viewedProfilePictureUrl || "",
+                        isFollow: newFollowState, // Use the actual follow state
+                      },
+                    ]
+                  : state.Following.filter((f) => f.userId !== followingUsername);
+                
+                // We're only updating the followers count of the viewed profile, not our own following count
+                // When we follow someone, we increment their followers count
+                // When we unfollow someone, we decrement their followers count
+                const newFollowersCount = newFollowState
+                  ? state.followersCount + 1  // We're following, so increment the follower count
+                  : Math.max(0, state.followersCount - 1);  // We're unfollowing, so decrement the follower count
+                
+                console.log("Optimistic UI update after reconnect - Old follower count:", state.followersCount);
+                console.log("Optimistic UI update after reconnect - New follower count:", newFollowersCount);
+                
+                return {
+                  // Only update the followers count, not the following count
+                  followersCount: newFollowersCount,
+                  Following: updatedFollowing,
+                  Followers: updatedFollowers,
+                  isFollowing: newFollowState,
+                };
+              });
+            }
+          } else {
+            console.error(
+              "WebSocket connection failed, cannot send follow request"
+            );
+            set({ error: "Failed to toggle follow status - connection issue" });
+          }
+        }, 500);
+      }
     } catch (error) {
       set({ error: "Failed to toggle follow status" });
       console.error("Error sending follow request:", error);
@@ -862,4 +1357,73 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
       set({ isLoading: false });
     }
   },
+
+  getNotifications: async (username : string) => {
+    set({ isLoading: true, error: null})
+    try {
+      const response = await api.get<Notification[]>(`/notifications/${username}`);
+      const notifications = response.data || [];
+
+      // Sort notifications by createdAt date (newest first)
+      const sortedNotifications = [...notifications].sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      set({
+        notifications: sortedNotifications.map((notification) => ({
+          id: notification.id || crypto.randomUUID(),
+          type: notification.type,
+          message: notification.message,
+          userId: notification.userId,
+          senderUsername: notification.senderUsername,
+          profilePictureUrl: notification.profilePictureUrl,
+          createdAt: new Date(notification.createdAt),
+          read: notification.read,
+          isRead: notification.isRead || false,
+          memeId: notification.memeId
+        })),
+        isLoading: false,
+      });
+    } catch (error) {
+      set({
+        error: "Failed to fetch notifications",
+        isLoading: false,
+      });
+      console.error("Error fetching notifications:", error);
+    }
+  },
+  
+  // Add a new notification to the state in real-time
+  addNotification: (notification) => {
+    set((state) => {
+      // Create a new notification object with default values for missing fields
+      const newNotification: Notification = {
+        id: notification.id || crypto.randomUUID(),
+        type: notification.type || 'info',
+        message: notification.message || '',
+        userId: notification.userId || '',
+        senderUsername: notification.senderUsername || '',
+        profilePictureUrl: notification.profilePictureUrl || '',
+        createdAt: notification.createdAt || new Date(),
+        read: notification.read || false,
+        isRead: notification.isRead || false,
+        memeId: notification.memeId
+      };
+      
+      // Check if this notification already exists (by ID)
+      const exists = state.notifications.some(n => n.id === newNotification.id);
+      
+      if (!exists) {
+        // Add the new notification at the beginning of the array (newest first)
+        return {
+          notifications: [newNotification, ...state.notifications]
+        };
+      }
+      
+      return state; // No changes if notification already exists
+    });
+  }
 }));
+
+
+

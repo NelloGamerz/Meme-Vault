@@ -2,6 +2,7 @@ package com.example.Meme.Website.WebSockets;
 
 import java.io.IOException;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
@@ -9,6 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
 
 import com.example.Meme.Website.models.Comments;
+import com.example.Meme.Website.services.NotificationService;
+import com.example.Meme.Website.services.ProfileService;
 import com.example.Meme.Website.services.memeService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,9 +21,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class CustomWebSocketHandler implements WebSocketHandler {
 
     private final memeService memeService;
+    private final ProfileService profileService;
 
-    public CustomWebSocketHandler(memeService memeService) {
+    public CustomWebSocketHandler(memeService memeService, ProfileService profileService) {
         this.memeService = memeService;
+        this.profileService = profileService;
     }
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -79,6 +84,30 @@ public class CustomWebSocketHandler implements WebSocketHandler {
                 memeService.addCommentsToMeme(comment);
                 break;
 
+            // case "FOLLOW":
+            // System.out.println("Incoming message: " + json.toPrettyString());
+
+            // String followedUsername = json.get("followingUsername").asText();
+            // // profileService.followUser(username, followedUsername);
+            // boolean isFollowing = json.has("isFollowing") &&
+            // json.get("isFollowing").asBoolean();
+            // Map<String, Boolean> requestBody = new HashMap<>();
+            // requestBody.put("isFollowing", isFollowing);
+
+            // profileService.followUserByUsername(username, followedUsername, requestBody);
+
+            case "FOLLOW":
+            System.out.println("Incoming message: " + json.toPrettyString());
+                String followerUsername = json.get("followerUsername").asText();
+                String followingUsername = json.get("followingUsername").asText(); // Not "followedUsername"!
+
+                boolean isFollowing = json.has("isFollowing") && json.get("isFollowing").asBoolean();
+                Map<String, Boolean> requestBody = new HashMap<>();
+                requestBody.put("isFollowing", isFollowing);
+
+                profileService.followUserByUsername(followerUsername, followingUsername, requestBody);
+                break;
+
             default:
                 session.sendMessage(new TextMessage("{\"error\":\"Unknown type: " + type + "\"}"));
         }
@@ -89,7 +118,8 @@ public class CustomWebSocketHandler implements WebSocketHandler {
         String action = json.get("action").asText();
         boolean isLike = action.equalsIgnoreCase("LIKE");
 
-        ResponseEntity<?> response = memeService.likedMemes(username, memeId, isLike);        ObjectNode likePayload = objectMapper.createObjectNode();
+        ResponseEntity<?> response = memeService.likedMemes(username, memeId, isLike);
+        ObjectNode likePayload = objectMapper.createObjectNode();
         likePayload.put("type", "LIKE");
         likePayload.put("memeId", memeId);
         likePayload.put("username", username);

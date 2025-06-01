@@ -88,29 +88,54 @@ export interface ApiSave {
 
 
 export interface ApiFollowers{
-  userId : string;
+  userId?: string;
   username: string;
   profilePictureUrl: string;
   isFollow: boolean;
 }
 
 export interface ApiFollowing{
-  userId : string;
+  userId?: string;
   username: string;
   profilePictureUrl: string;
   isFollow: boolean;
 }
 
 export interface Followers{
-  userId: string;
+  userId?: string;
   username: string;
   profilePictureUrl: string;
   isFollow: boolean;
 }
 
 export interface Following{
-  userId: string;
+  userId?: string;
   username: string;
   profilePictureUrl: string;
   isFollow: boolean;
+}
+
+export interface ApiNotifications{
+  id: string,
+  userId: string;
+  username: string;
+  profilePictureUrl: string;
+  type: string;
+  message: string;
+  createdAt: string;
+  read: boolean;
+  isRead: boolean;
+}
+
+export interface Notification{
+  id: string,
+  userId: string;
+  senderUsername: string;
+  profilePictureUrl: string;
+  type: string;
+  message: string;
+  createdAt: Date;
+  read: boolean;
+  isRead: boolean;
+  memeId?: string;
 }

@@ -11,6 +11,7 @@ import com.example.Meme.Website.models.userModel;
 public interface userRepository extends MongoRepository<userModel, String> {
     Optional<userModel> findByEmail(String email);
     Optional<userModel> findByUsername(String username);
+    Optional<userModel> findByUserId(String userId);
     boolean existsByEmail(String email);
     boolean existsByUsername(String username);
 }

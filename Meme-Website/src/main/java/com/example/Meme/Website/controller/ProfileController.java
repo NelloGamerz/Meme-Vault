@@ -24,9 +24,9 @@ public class ProfileController {
         return profileService.uploadProfilePicture(userId, file);
     }
 
-    @GetMapping("/{userId}")
-    public ResponseEntity<?> userProfile(@PathVariable String userId) {
-        return profileService.userProfile(userId);
+    @GetMapping("/{username}")
+    public ResponseEntity<?> userProfile(@PathVariable String username) {
+        return profileService.userProfile(username);
     }
 
     @GetMapping("/{userId}/followers")

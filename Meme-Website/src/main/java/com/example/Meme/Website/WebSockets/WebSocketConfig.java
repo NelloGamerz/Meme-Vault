@@ -8,6 +8,8 @@ import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 
+import com.example.Meme.Website.services.NotificationService;
+import com.example.Meme.Website.services.ProfileService;
 import com.example.Meme.Website.services.memeService;
 
 @Configuration
@@ -19,6 +21,8 @@ public class WebSocketConfig implements WebSocketConfigurer{
 
     @Autowired
     private memeService memeService;
+    @Autowired
+    private ProfileService profileService;
 
     @Value("${frontend.websocket.url}")
     private String frontendUrl;
@@ -31,6 +35,6 @@ public class WebSocketConfig implements WebSocketConfigurer{
     }
 
     public WebSocketHandler webSocketHandler(){
-        return new CustomWebSocketHandler(memeService);
+        return new CustomWebSocketHandler(memeService, profileService);
     }
 }

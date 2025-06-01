@@ -53,6 +53,8 @@ public class memeService {
     private RedisService redisService;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private NotificationService notificationService;
 
 
     @Transactional
@@ -136,6 +138,16 @@ public class memeService {
                     meme.setLikecount(meme.getLikecount() + 1);
                     message = "Meme liked successfully";
                     System.out.println("Meme liked by user: " + username);
+
+                    if(!username.equals(meme.getUploader())){
+                        String sender = username;
+                        String recepient = meme.getUploader();
+                        String type = "LIKE";
+                        String notificationMessage = sender + " liked your meme";
+                        String profilePictureUrl = user.getProfilePictureUrl();
+                        String memeIdForNotification = meme.getId();
+                        notificationService.sendNotification(sender, recepient, type, notificationMessage, profilePictureUrl, memeIdForNotification);
+                    }
                 } else {
                     message = "Meme already liked";
                 }
@@ -392,6 +404,16 @@ public class memeService {
             ownerSession.sendMessage(message);
         } else {
             System.out.println("Post owner WebSocket session not found or not open for user ID: " + ownerId);
+        }
+
+        if(!comment.getUsername().equals(meme.getUploader())){
+            String sender = comment.getUsername();
+            String recepient = meme.getUploader();
+            String type = "COMMENT";
+            String notificationMessage = sender + " commented on your meme: " + meme.getCaption();
+            String profilePictureUrl = comment.getProfilePictureUrl();
+            String memeId = comment.getMemeId();
+            notificationService.sendNotification(sender, recepient, type, notificationMessage, profilePictureUrl, memeId);
         }
 
         System.out.println("Finished addCommentsToMeme(). Returning saved comment.");

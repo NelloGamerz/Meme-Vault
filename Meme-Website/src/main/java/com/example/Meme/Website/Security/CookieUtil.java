@@ -9,25 +9,47 @@ import jakarta.servlet.http.HttpServletResponse;
 @Component
 public class CookieUtil {
 
+    // public void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
+    //     Cookie cookie = new Cookie(name, value);
+    //     cookie.setPath("/");
+    //     cookie.setHttpOnly(true);
+    //     cookie.setSecure(true);
+    //     cookie.setMaxAge(maxAge);
+
+    //     response.addCookie(cookie);
+
+    //     StringBuilder cookieHeader = new StringBuilder();
+    //     cookieHeader.append(name).append("=").append(value)
+    //             .append("; Path=/")
+    //             .append("; Max-Age=").append(maxAge)
+    //             .append("; Secure")
+    //             .append("; HttpOnly")
+    //             .append("; SameSite=None");
+
+    //     response.setHeader("Set-Cookie", cookieHeader.toString());
+    // }
+
     public void addCookie(HttpServletResponse response, String name, String value, int maxAge) {
-        Cookie cookie = new Cookie(name, value);
-        cookie.setPath("/");
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setMaxAge(maxAge);
+    Cookie cookie = new Cookie(name, value);
+    cookie.setPath("/");
+    cookie.setHttpOnly(true);
+    cookie.setSecure(false); // ⚠️ Must be false for localhost (HTTP)
+    cookie.setMaxAge(maxAge);
 
-        response.addCookie(cookie);
+    response.addCookie(cookie);
 
-        StringBuilder cookieHeader = new StringBuilder();
-        cookieHeader.append(name).append("=").append(value)
-                .append("; Path=/")
-                .append("; Max-Age=").append(maxAge)
-                .append("; Secure")
-                .append("; HttpOnly")
-                .append("; SameSite=None");
+    // Optional manual Set-Cookie header for extra control
+    // StringBuilder cookieHeader = new StringBuilder();
+    // cookieHeader.append(name).append("=").append(value)
+    //         .append("; Path=/")
+    //         .append("; Max-Age=").append(maxAge)
+    //         .append("; HttpOnly")
+    //         // Don't set SameSite=None without Secure
+    //         .append("; SameSite=Lax"); // or remove SameSite entirely
 
-        response.setHeader("Set-Cookie", cookieHeader.toString());
-    }
+    // response.setHeader("Set-Cookie", cookieHeader.toString());
+}
+
 
     public void deleteCookie(HttpServletResponse response, String name) {
         Cookie cookie = new Cookie(name, null);

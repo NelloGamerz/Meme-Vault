@@ -8,7 +8,7 @@ import {
   Heart,
   Bookmark,
   Edit2,
-  Home,
+  // Home,
   CameraIcon,
   X,
   ImagePlus,
@@ -18,6 +18,7 @@ import {
   Search,
 } from "lucide-react"
 import { useNavigate, useParams } from "react-router-dom"
+// import { useWebSocketStore } from "../../hooks/useWebSockets"
 import { cn } from "../../hooks/utils"
 
 type TabType = "uploaded" | "liked" | "saved"
@@ -77,6 +78,8 @@ export const ProfilePage: React.FC = () => {
     fetchUserProfile,
     profilePictureUrl,
     userName,
+    viewedProfilePictureUrl,
+    viewedUserName,
     updateUserName,
     followersCount,
     followingCount,
@@ -103,13 +106,43 @@ export const ProfilePage: React.FC = () => {
   const [animationDirection, setAnimationDirection] = useState<"left" | "right">("right")
   const [searchTerm, setSearchTerm] = useState("")
 
-  const { userId } = useParams<{ userId: string }>()
+  const { username } = useParams<{ username: string }>()
   const loggedInUser = JSON.parse(localStorage.getItem("user") || "{}")
-  const isOwnProfile = loggedInUser.userId === userId
+  // Determine if this is the user's own profile
+  const isOwnProfile = loggedInUser.username === username
 
+  // Determine if the current user is following the viewed profile
+  // Example: If Pooja (current user) is viewing Karan's profile, this checks if Pooja follows Karan
   const isUserFollowing = () => {
-    if (!userId || isOwnProfile || !Array.isArray(Followers)) return false
-    return Followers.some((follower) => follower.userId === loggedInUser.userId)
+    // If it's the user's own profile, they can't follow themselves
+    if (!username || isOwnProfile || !Array.isArray(Followers)) return false;
+    
+    console.log("ProfilePage: Checking if current user follows viewed profile");
+    console.log("ProfilePage: Followers list of viewed profile:", Followers);
+    console.log("ProfilePage: Looking for loggedInUser.userId:", loggedInUser.userId);
+    
+    // When viewing someone else's profile (e.g., Karan), we need to check if the current user (Pooja)
+    // is in the viewed profile's followers list (Karan's followers)
+    const result = Followers.some((follower) => follower.userId === loggedInUser.userId);
+    console.log("ProfilePage: isUserFollowing result:", result);
+    return result;
+  }
+  
+  // Determine if the viewed profile is following the current user
+  // Example: If Karan (current user) is viewing Pooja's profile, this checks if Pooja follows Karan
+  const isViewedProfileFollowingUser = () => {
+    // If it's the user's own profile, this check doesn't apply
+    if (!username || isOwnProfile || !Array.isArray(Following)) return false;
+    
+    console.log("ProfilePage: Checking if viewed profile follows current user");
+    console.log("ProfilePage: Following list of viewed profile:", Following);
+    console.log("ProfilePage: Looking for loggedInUser.userId:", loggedInUser.userId);
+    
+    // When viewing someone else's profile (e.g., Pooja), we need to check if the current user (Karan)
+    // is in the viewed profile's following list (users that Pooja follows)
+    const result = Following.some((following) => following.userId === loggedInUser.userId);
+    console.log("ProfilePage: isViewedProfileFollowingUser result:", result);
+    return result;
   }
 
   const [editName, setEditName] = useState("")
@@ -118,11 +151,44 @@ export const ProfilePage: React.FC = () => {
   const [followingLoading, setFollowingLoading] = useState(false)
   const [isFollowingModalOpen, setIsFollowingModalOpen] = useState(false)
 
+  // Fetch the profile data when the component mounts or when the userId changes
   useEffect(() => {
-    if (userId) {
-      fetchUserProfile(userId)
+    if (username) {
+      console.log("ProfilePage: Fetching profile for username:", username);
+      console.log("ProfilePage: isOwnProfile:", isOwnProfile);
+      console.log("ProfilePage: loggedInUser:", loggedInUser);
+      
+      // This will fetch the profile data for the userId in the URL
+      fetchUserProfile(username);
     }
-  }, [fetchUserProfile, userId])
+  }, [fetchUserProfile, username])
+  
+  // Debug effect to log followers and following data when they change
+  useEffect(() => {
+    console.log("ProfilePage: Followers data updated:", Followers);
+    console.log("ProfilePage: Following data updated:", Following);
+    
+    // Check if the current user is following the viewed profile
+    if (Array.isArray(Followers) && Followers.length > 0) {
+      const isCurrentUserFollowing = Followers.some(follower => follower.userId === loggedInUser.userId);
+      console.log("ProfilePage: Is current user following viewed profile:", isCurrentUserFollowing);
+    }
+    
+    // Check if the viewed profile is following the current user
+    if (Array.isArray(Following) && Following.length > 0) {
+      const isViewedProfileFollowing = Following.some(following => following.userId === loggedInUser.userId);
+      console.log("ProfilePage: Is viewed profile following current user:", isViewedProfileFollowing);
+    }
+    
+    // Log the follow button state that will be shown
+    const followButtonState = isUserFollowing() 
+      ? "Following" 
+      : isViewedProfileFollowingUser() 
+        ? "Follow Back" 
+        : "Follow";
+    console.log("ProfilePage: Follow button will show:", followButtonState);
+    
+  }, [Followers, Following, loggedInUser.userId])
 
   const tabs = [
     { id: "uploaded" as TabType, label: "Uploaded", icon: Upload },
@@ -164,8 +230,9 @@ export const ProfilePage: React.FC = () => {
     if (!selectedFile || !title.trim()) return
 
     try {
+      // Always use the logged-in user's profile picture for uploads
       await uploadMeme(selectedFile, title, profilePictureUrl, loggedInUser.userId)
-      fetchUserProfile(userId || "")
+      fetchUserProfile(username || "")
       setIsUploadModalOpen(false)
       resetUpload()
       toast.success("Meme uploaded successfully!")
@@ -194,7 +261,7 @@ export const ProfilePage: React.FC = () => {
 
     try {
       await updateProfilePicture(selectedProfilePicture, loggedInUser.userId)
-      fetchUserProfile(userId || "")
+      fetchUserProfile(username || "")
       setProfilePreviewUrl(null)
       setSelectedProfilePicture(null)
       setIsProfilePictureModalOpen(false)
@@ -209,7 +276,7 @@ export const ProfilePage: React.FC = () => {
     if (!editName.trim()) return
     try {
       await updateUserName(loggedInUser.userId, editName)
-      fetchUserProfile(userId || "")
+      fetchUserProfile(username || "")
       setIsEditProfileModalOpen(false)
       toast.success("Profile updated successfully!")
     } catch (error) {
@@ -318,18 +385,46 @@ export const ProfilePage: React.FC = () => {
   }
 
   const handleFollow = async () => {
-    if (!userId || isOwnProfile) return
+    if (!username || isOwnProfile) return
 
     const isFollowing = isUserFollowing()
+    const isBeingFollowed = isViewedProfileFollowingUser()
+    
+    console.log("ProfilePage: handleFollow - Current user:", loggedInUser.username);
+    console.log("ProfilePage: handleFollow - Viewed profile username:", username);
+    console.log("ProfilePage: handleFollow - isFollowing:", isFollowing);
+    console.log("ProfilePage: handleFollow - isBeingFollowed:", isBeingFollowed);
+    
+    setFollowersLoading(true)
 
     try {
-      await handleFollowToggle(userId, isFollowing)
-      await fetchUserProfile(userId)
+      // Use the handleFollowToggle function from useMemeStore
+      // This will handle the WebSocket connection internally
+      await handleFollowToggle(username, isFollowing)
+      
+      // Don't refresh the profile data - rely on WebSocket updates and optimistic UI updates
+      console.log("ProfilePage: Relying on optimistic UI updates for follow/unfollow");
+      
+      // Show a toast notification
+      if (isFollowing) {
+        toast.success('Unfollowed user');
+      } else if (isBeingFollowed) {
+        toast.success('Followed back');
+      } else {
+        toast.success('Following user');
+      }
     } catch (error) {
       console.error("Error toggling follow status:", error)
+      toast.error('Failed to update follow status');
+    } finally {
+      setFollowersLoading(false)
     }
   }
 
+  console.log("ProfilePage: Rendering with isOwnProfile:", isOwnProfile);
+  console.log("ProfilePage: viewedUserName:", viewedUserName);
+  console.log("ProfilePage: userName:", userName);
+  
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -340,16 +435,32 @@ export const ProfilePage: React.FC = () => {
             <div className="flex flex-col sm:flex-row items-center sm:items-start md:items-center gap-4 sm:gap-8">
               <div className="relative group">
                 <div className="w-24 h-24 sm:w-32 sm:h-32 bg-white rounded-full flex items-center justify-center shadow-xl overflow-hidden">
-                  {profilePictureUrl ? (
-                    <img
-                      src={profilePictureUrl || "/placeholder.svg"}
-                      alt={userName}
-                      className="w-full h-full object-cover"
-                    />
+                  {isOwnProfile ? (
+                    // Show logged-in user's profile picture when viewing own profile
+                    profilePictureUrl ? (
+                      <img
+                        src={profilePictureUrl || "/placeholder.svg"}
+                        alt={userName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-3xl sm:text-5xl font-bold text-blue-600">
+                        {userName?.[0]?.toUpperCase() || "U"}
+                      </span>
+                    )
                   ) : (
-                    <span className="text-3xl sm:text-5xl font-bold text-blue-600">
-                      {userName?.[0]?.toUpperCase() || "U"}
-                    </span>
+                    // Show viewed user's profile picture when viewing other profiles
+                    viewedProfilePictureUrl ? (
+                      <img
+                        src={viewedProfilePictureUrl || "/placeholder.svg"}
+                        alt={viewedUserName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-3xl sm:text-5xl font-bold text-blue-600">
+                        {viewedUserName?.[0]?.toUpperCase() || "U"}
+                      </span>
+                    )
                   )}
                 </div>
                 {isOwnProfile && (
@@ -362,7 +473,9 @@ export const ProfilePage: React.FC = () => {
                 )}
               </div>
               <div className="text-center sm:text-left">
-                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">{userName || "User"}</h2>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
+                  {isOwnProfile ? (userName || "User") : (viewedUserName || "User")}
+                </h2>
                 <div className="flex items-center justify-center sm:justify-start space-x-4 sm:space-x-6 mt-3 sm:mt-4">
                   <div className="text-center">
                     <span className="block text-xl sm:text-2xl font-bold">{userMemes.length}</span>
@@ -403,28 +516,41 @@ export const ProfilePage: React.FC = () => {
                   disabled={followersLoading}
                   className={`${isUserFollowing() ? "bg-blue-700" : "bg-white/10"} backdrop-blur-sm text-white py-2 px-4 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors border border-white/20 w-full sm:w-auto ${followersLoading ? "opacity-70 cursor-not-allowed" : ""}`}
                 >
-                  {followersLoading ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : isUserFollowing() ? (
-                    <>
-                      <UserCheck className="w-5 h-5" />
-                      <span>Following</span>
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="w-5 h-5" />
-                      <span>Follow</span>
-                    </>
-                  )}
+                  {(() => {
+                    // Calculate these values once to ensure consistency
+                    const isFollowing = isUserFollowing();
+                    const isBeingFollowed = isViewedProfileFollowingUser();
+                    
+                    console.log("ProfilePage: Render button - isFollowing:", isFollowing);
+                    console.log("ProfilePage: Render button - isBeingFollowed:", isBeingFollowed);
+                    
+                    if (followersLoading) {
+                      return <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>;
+                    } else if (isFollowing) {
+                      return (
+                        <>
+                          <UserCheck className="w-5 h-5" />
+                          <span>Following</span>
+                        </>
+                      );
+                    } else if (isBeingFollowed) {
+                      return (
+                        <>
+                          <UserPlus className="w-5 h-5" />
+                          <span>Follow Back</span>
+                        </>
+                      );
+                    } else {
+                      return (
+                        <>
+                          <UserPlus className="w-5 h-5" />
+                          <span>Follow</span>
+                        </>
+                      );
+                    }
+                  })()}
                 </button>
               )}
-              <button
-                onClick={() => navigate("/")}
-                className="bg-white/10 backdrop-blur-sm text-white py-2 px-4 rounded-lg flex items-center justify-center space-x-2 hover:bg-white/20 transition-colors border border-white/20 w-full sm:w-auto"
-              >
-                <Home className="w-5 h-5" />
-                <span>Dashboard</span>
-              </button>
             </div>
           </div>
         </div>
@@ -730,7 +856,7 @@ export const ProfilePage: React.FC = () => {
                       <li
                         key={follower.userId}
                         className="py-3 flex items-center hover:bg-gray-50 rounded-lg px-2 cursor-pointer"
-                        onClick={() => navigateToProfile(follower.userId)}
+                        onClick={() => navigateToProfile(follower.username)}
                       >
                         <div className="flex-shrink-0 h-10 w-10">
                           {follower.profilePictureUrl ? (
@@ -801,7 +927,7 @@ export const ProfilePage: React.FC = () => {
                       <li
                         key={following.userId}
                         className="py-3 flex items-center hover:bg-gray-50 rounded-lg px-2 cursor-pointer"
-                        onClick={() => navigateToProfile(following.userId)}
+                        onClick={() => navigateToProfile(following.username)}
                       >
                         <div className="flex-shrink-0 h-10 w-10">
                           {following.profilePictureUrl ? (
