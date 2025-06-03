@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMemeStore } from "../store/useMemeStore.ts";
+import useWebSocketStore from "../hooks/useWebSockets";
 import {
   Heart,
   Bookmark,
@@ -42,10 +43,12 @@ const MemeDetailPage: React.FC = () => {
     profilePictureUrl,
     joinPostSession,
     leavePostSession,
-    wsClient,
     // loggedInUserProfile,
     isLoggedInUserProfileLoaded,
   } = useMemeStore();
+  
+  // Get WebSocket client from the WebSocketStore
+  const { client: wsClient } = useWebSocketStore();
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
@@ -147,7 +150,7 @@ const MemeDetailPage: React.FC = () => {
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (comment.trim() && id) {
-      if (!useMemeStore.getState().wsClient) {
+      if (!wsClient) {
         toast.error("Cannot add comment: WebSocket connection not established");
         return;
       }

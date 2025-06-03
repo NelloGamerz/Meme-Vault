@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import api from "../hooks/api";
 import { useWebSocketStore } from "../hooks/useWebSockets";
+import type { WebSocketMessageType } from "../services/WebSocketService";
 import type {
   Meme,
   ApiMeme,
@@ -60,7 +61,6 @@ interface MemeStore {
     timestamp: number;
   }>;
   // WebSocket related properties
-  wsClient: WebSocket | null;
   wsMessageHandler: ((event: MessageEvent) => void) | null;
   wsUnsubscribe: (() => void) | null;
   // Methods
@@ -178,16 +178,15 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
   isLoggedInUserProfileLoaded: false,
   // Profile cache to store previously loaded profiles
   profileCache: {},
-  wsClient: null,
   wsMessageHandler: null,
   wsUnsubscribe: null,
 
   connectWebSocket: () => {
-    // Get the WebSocket client from the centralized store
+    // Get the WebSocket store from the centralized store
     const wsStore = useWebSocketStore.getState();
     
     // If we don't have a connection, try to establish one
-    if (!wsStore.isConnected || !wsStore.client || wsStore.client.readyState !== WebSocket.OPEN) {
+    if (!wsStore.isConnected) {
       console.log("No active WebSocket connection, attempting to connect via WebSocketStore");
       wsStore.restoreConnection();
       
@@ -198,10 +197,8 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
       
       const checkConnection = () => {
         const updatedWsStore = useWebSocketStore.getState();
-        if (updatedWsStore.isConnected && updatedWsStore.client && updatedWsStore.client.readyState === WebSocket.OPEN) {
+        if (updatedWsStore.isConnected) {
           console.log("WebSocket connection established after retry, setting up handlers");
-          // Use the updated client
-          set({ wsClient: updatedWsStore.client });
           
           // Register message handlers
           registerMessageHandlers();
@@ -228,11 +225,8 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
     }
     
     // If we have an active connection, set up message handling for meme-specific events
-    if (wsStore.client.readyState === WebSocket.OPEN) {
+    if (wsStore.isConnected) {
       console.log("Using existing WebSocket connection from WebSocketStore");
-      
-      // Set the client in our store
-      set({ wsClient: wsStore.client });
       
       // Register message handlers
       registerMessageHandlers();
@@ -253,11 +247,8 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
       
       // Set up a subscription to the WebSocketStore to handle connection changes
       const connectionUnsubscribe = useWebSocketStore.subscribe((state) => {
-        // If the connection status changes, update our local reference
-        set({ wsClient: state.client });
-        
         // If we reconnected and were viewing a meme, rejoin that session
-        if (state.isConnected && state.client && lastJoinedPostId) {
+        if (state.isConnected && lastJoinedPostId) {
           get().joinPostSession(lastJoinedPostId);
         }
       });
@@ -507,17 +498,12 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
 
   disconnectWebSocket: () => {
     // Get the current state
-    const { wsClient, wsMessageHandler, wsUnsubscribe } = get();
+    const { wsUnsubscribe } = get();
     
     // Leave any active meme session
     if (currentMemeId) {
       // Use the centralized WebSocketStore to send the leave message
       useWebSocketStore.getState().sendLeavePostRequest(currentMemeId);
-    }
-    
-    // Clean up event listeners if we have any direct message handlers
-    if (wsClient && wsMessageHandler) {
-      wsClient.removeEventListener('message', wsMessageHandler);
     }
     
     // Unsubscribe from WebSocketStore updates
@@ -527,7 +513,6 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
     
     // Reset WebSocket-related state
     set({ 
-      wsClient: null,
       wsMessageHandler: null,
       wsUnsubscribe: null
     });
@@ -543,7 +528,7 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
   joinPostSession: (postId: string) => {
     const wsStore = useWebSocketStore.getState();
     
-    if (wsStore.isConnected && wsStore.client && wsStore.client.readyState === WebSocket.OPEN) {
+    if (wsStore.isConnected) {
       // Leave current post session if we're joining a different one
       if (currentMemeId && currentMemeId !== postId) {
         wsStore.sendLeavePostRequest(currentMemeId);
@@ -563,7 +548,7 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
   leavePostSession: (postId: string) => {
     const wsStore = useWebSocketStore.getState();
     
-    if (wsStore.isConnected && wsStore.client && wsStore.client.readyState === WebSocket.OPEN) {
+    if (wsStore.isConnected) {
       wsStore.sendLeavePostRequest(postId);
 
       if (currentMemeId === postId) {
@@ -1197,7 +1182,6 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
   },
 
   toggleLike: async (id: string, username: string) => {
-    const wsClient = get().wsClient;
     try {
       const isLiked = get().likedMemes.some((meme) => meme.id === id);
       const action = isLiked ? "UNLIKE" : "LIKE";
@@ -1235,16 +1219,32 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
         };
       });
 
-      if (wsClient && wsClient.readyState === WebSocket.OPEN) {
-        const message = {
-          type: "LIKE",
+      // Use the WebSocketStore to send the message
+      const wsStore = useWebSocketStore.getState();
+      if (wsStore.isConnected) {
+        wsStore.sendMessage({
+          type: 'LIKE' as const,
           memeId: id,
           action,
           username,
-        };
-        wsClient.send(JSON.stringify(message));
+        });
       } else {
-        console.error("WebSocket is not connected. Cannot toggle like.");
+        console.log("WebSocket not connected, attempting to connect...");
+        get().connectWebSocket();
+        // Try to send the message after a short delay to allow connection to establish
+        setTimeout(() => {
+          const updatedWsStore = useWebSocketStore.getState();
+          if (updatedWsStore.isConnected) {
+            updatedWsStore.sendMessage({
+              type: 'LIKE' as WebSocketMessageType,
+              memeId: id,
+              action,
+              username,
+            });
+          } else {
+            console.error("WebSocket is still not connected. Cannot toggle like.");
+          }
+        }, 1000);
       }
     } catch (error) {
       console.error("Error toggling like via WebSocket:", error);
@@ -1252,7 +1252,6 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
   },
 
   toggleSave: async (id: string, username: string) => {
-    const wsClient = get().wsClient;
     try {
       const isSaved = get().savedMemes.some((meme) => meme.id === id);
       const action = isSaved ? "UNSAVE" : "SAVE";
@@ -1290,16 +1289,32 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
         };
       });
 
-      if (wsClient && wsClient.readyState === WebSocket.OPEN) {
-        const message = {
-          type: "SAVE",
+      // Use the WebSocketStore to send the message
+      const wsStore = useWebSocketStore.getState();
+      if (wsStore.isConnected) {
+        wsStore.sendMessage({
+          type: 'SAVE' as const,
           memeId: id,
           action,
           username,
-        };
-        wsClient.send(JSON.stringify(message));
+        });
       } else {
-        console.error("WebSocket is not connected. Cannot toggle save.");
+        console.log("WebSocket not connected, attempting to connect...");
+        get().connectWebSocket();
+        // Try to send the message after a short delay to allow connection to establish
+        setTimeout(() => {
+          const updatedWsStore = useWebSocketStore.getState();
+          if (updatedWsStore.isConnected) {
+            updatedWsStore.sendMessage({
+              type: 'SAVE' as WebSocketMessageType,
+              memeId: id,
+              action,
+              username,
+            });
+          } else {
+            console.error("WebSocket is still not connected. Cannot toggle save.");
+          }
+        }, 1000);
       }
     } catch (error) {
       console.error("Error toggling save via WebSocket:", error);
@@ -1315,23 +1330,42 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
     profilePictureUrl: string,
     userId: string
   ) => {
-    const wsClient = get().wsClient;
     try {
-      if (!wsClient || wsClient.readyState !== WebSocket.OPEN) {
-        console.error("WebSocket not connected. Cannot add comment.");
-        return;
-      }
-      const comment = {
-        type: "COMMENT",
-        memeId,
-        username,
-        text,
-        profilePictureUrl,
-        userId,
-        createdAt: new Date().toISOString(),
-      };
+      const wsStore = useWebSocketStore.getState();
+      
+      if (wsStore.isConnected) {
+        const comment = {
+          type: 'COMMENT' as const,
+          memeId,
+          username,
+          text,
+          profilePictureUrl,
+          userId,
+          createdAt: new Date().toISOString(),
+        };
 
-      wsClient.send(JSON.stringify(comment));
+        wsStore.sendMessage(comment);
+      } else {
+        console.log("WebSocket not connected, attempting to connect...");
+        get().connectWebSocket();
+        // Try to send the message after a short delay to allow connection to establish
+        setTimeout(() => {
+          const updatedWsStore = useWebSocketStore.getState();
+          if (updatedWsStore.isConnected) {
+            updatedWsStore.sendMessage({
+              type: 'COMMENT' as WebSocketMessageType,
+              memeId,
+              username,
+              text,
+              profilePictureUrl,
+              userId,
+              createdAt: new Date().toISOString(),
+            });
+          } else {
+            console.error("WebSocket is still not connected. Cannot add comment.");
+          }
+        }, 1000);
+      }
     } catch (error) {
       console.error("Error adding comment via WebSocket:", error);
     }
@@ -1370,7 +1404,8 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
   },
 
   handleFollowToggle: async (isFollowing: boolean) => {
-    const wsClient = get().wsClient;
+    // Get the WebSocket store from the centralized store
+    const wsStore = useWebSocketStore.getState();
     const loggedInUser = getUserFromLocalStorage();
     set({ isLoading: true, error: null });
 
@@ -1393,7 +1428,7 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
 
       // Create the WebSocket message
       const followMessage = {
-        type: "FOLLOW",
+        type: 'FOLLOW' as WebSocketMessageType,
         followerId: loggedInUser.userId,
         followerUsername: loggedInUser.username,
         // followingId: followingUserId,
@@ -1403,9 +1438,9 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
         followingProfilePictureUrl: followingProfilePicture || "",
       };
 
-      // Use the existing WebSocket connection from useMemeStore
-      if (wsClient && wsClient.readyState === WebSocket.OPEN) {
-        wsClient.send(JSON.stringify(followMessage));
+      // Use the WebSocketStore to send the message
+      if (wsStore.isConnected) {
+        wsStore.sendMessage(followMessage);
         console.log("WebSocket message sent:", followMessage);
 
         // Optimistically update the UI state
@@ -1467,8 +1502,10 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
         console.log("WebSocket not connected, attempting to connect...");
         get().connectWebSocket();
         setTimeout(() => {
-          if (wsClient && wsClient.readyState === WebSocket.OPEN) {
-            wsClient.send(JSON.stringify(followMessage));
+          // Get the updated WebSocket store
+          const updatedWsStore = useWebSocketStore.getState();
+          if (updatedWsStore.isConnected) {
+            updatedWsStore.sendMessage(followMessage);
             console.log("WebSocket message sent after reconnect:", followMessage);
 
             // Optimistically update the UI state
@@ -1504,7 +1541,7 @@ export const useMemeStore = create<MemeStore>((set, get) => ({
                         isFollow: newFollowState, // Use the actual follow state
                       },
                     ]
-                  : state.Following.filter((f) => f.userId !== followingUsername);
+                  : state.Following.filter((f) => f.username !== followingUsername);
                 
                 // We're only updating the followers count of the viewed profile, not our own following count
                 // When we follow someone, we increment their followers count

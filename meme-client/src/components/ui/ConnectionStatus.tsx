@@ -1,31 +1,28 @@
 import React, { useEffect, useState, useRef, memo } from 'react';
-import { useWebSocketStore } from '../../hooks/useWebSockets';
+import WebSocketService from '../../services/WebSocketService';
 import { Wifi, WifiOff } from 'lucide-react';
 
 // Use memo to prevent unnecessary re-renders
 export const ConnectionStatus: React.FC = memo(() => {
-  // Use a ref to track connection state to minimize re-renders
-  const connectionStateRef = useRef<boolean>(useWebSocketStore.getState().isConnected);
+  // State for UI
   const [showStatus, setShowStatus] = useState<boolean>(false);
   const [fadeOut, setFadeOut] = useState<boolean>(false);
-  const [isConnected, setIsConnected] = useState<boolean>(connectionStateRef.current);
-  const timersRef = useRef<{fadeTimer?: NodeJS.Timeout, hideTimer?: NodeJS.Timeout, checkTimer?: NodeJS.Timeout}>({});
+  const [isConnected, setIsConnected] = useState<boolean>(WebSocketService.isConnected());
+  const timersRef = useRef<{fadeTimer?: NodeJS.Timeout, hideTimer?: NodeJS.Timeout}>({});
   
   // Function to manually check connection and reconnect if needed
   const checkAndReconnect = () => {
     try {
-      const wsStore = useWebSocketStore.getState();
-      const currentConnectionState = wsStore.isConnected;
+      // Check connection and reconnect if needed
+      WebSocketService.checkConnection();
       
-      // Only update state if connection state has changed
-      if (currentConnectionState !== connectionStateRef.current) {
-        connectionStateRef.current = currentConnectionState;
-        setIsConnected(currentConnectionState);
-      }
+      // Update UI state based on current connection state
+      setIsConnected(WebSocketService.isConnected());
       
-      if (!currentConnectionState) {
+      // If not connected, try to restore the connection
+      if (!WebSocketService.isConnected()) {
         console.log("Connection status check: Not connected, attempting to restore connection");
-        wsStore.restoreConnection();
+        WebSocketService.restoreConnection();
         
         // Also try to reconnect the meme store WebSocket
         const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -44,69 +41,13 @@ export const ConnectionStatus: React.FC = memo(() => {
 
   // Set up subscription to connection state changes
   useEffect(() => {
-    // Initial check
-    checkAndReconnect();
-    
-    // Subscribe to connection state changes
-    const unsubscribe = useWebSocketStore.subscribe((state) => {
-      // Only update if the connection state has actually changed
-      const connected = state.isConnected;
-      if (connected !== connectionStateRef.current) {
-        connectionStateRef.current = connected;
-        setIsConnected(connected);
-      }
+    // Register a listener for connection state changes
+    const unsubscribe = WebSocketService.registerConnectionStateListener((state) => {
+      setIsConnected(state === 'CONNECTED');
     });
-    
-    // Set up a periodic connection check that doesn't cause re-renders
-    // Use a longer interval to reduce frequency of checks
-    timersRef.current.checkTimer = setInterval(checkAndReconnect, 60000); // 60 seconds
     
     return () => {
       unsubscribe();
-      if (timersRef.current.checkTimer) {
-        clearInterval(timersRef.current.checkTimer);
-      }
-    };
-  }, []);
-
-  // Handle visibility changes and page load to update connection status
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log('Page became visible, checking WebSocket connection');
-        checkAndReconnect();
-      }
-    };
-    
-    // Function to handle page load/refresh
-    const handlePageLoad = () => {
-      console.log('Page loaded/refreshed, ensuring WebSocket connection');
-      // Force reconnection on page load
-      const wsStore = useWebSocketStore.getState();
-      wsStore.restoreConnection();
-      
-      // Also reconnect the meme store WebSocket
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      if (user && user.userId) {
-        import("../../store/useMemeStore.ts").then(({ useMemeStore }) => {
-          useMemeStore.getState().connectWebSocket();
-        }).catch(err => {
-          console.error("Error importing useMemeStore:", err);
-        });
-      }
-    };
-    
-    // Add event listeners
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('load', handlePageLoad);
-    
-    // Call handlePageLoad immediately to ensure connection on component mount
-    // This is crucial for reconnection after page refresh
-    handlePageLoad();
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('load', handlePageLoad);
     };
   }, []);
 
