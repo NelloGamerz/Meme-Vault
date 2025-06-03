@@ -3,7 +3,7 @@ import { User, Heart, MessageCircle, ArrowLeft, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useWebSocketStore } from '../../hooks/useWebSockets';
 import { cn } from '../../hooks/utils';
-import { useMemeStore } from '../../store/useMemeStore';
+import { useMemeStore } from '../../store/useMemeStore.ts';
 import api from '../../hooks/api';
 import { Notification } from '../../types/mems';
 
@@ -48,6 +48,16 @@ export const NotificationsList: React.FC = () => {
             
             // Update the store with all notifications marked as read
             useMemeStore.setState({ notifications: updatedNotifications });
+            
+            // Dispatch a custom event to notify other components that notifications were read
+            try {
+              const notificationEvent = new CustomEvent('notifications-read', { 
+                detail: { count: unreadNotifications.length } 
+              });
+              window.dispatchEvent(notificationEvent);
+            } catch (error) {
+              console.error('Error dispatching notifications-read event:', error);
+            }
           }
         } catch (error) {
           console.error('Error marking notifications as read:', error);
@@ -355,6 +365,16 @@ export const NotificationPanel: React.FC = () => {
           
           // Update the store with all notifications marked as read
           useMemeStore.setState({ notifications: updatedNotifications });
+          
+          // Dispatch a custom event to notify other components that notifications were read
+          try {
+            const notificationEvent = new CustomEvent('notifications-read', { 
+              detail: { count: unreadNotifications.length } 
+            });
+            window.dispatchEvent(notificationEvent);
+          } catch (error) {
+            console.error('Error dispatching notifications-read event:', error);
+          }
         }
         
         // Navigate to notifications page

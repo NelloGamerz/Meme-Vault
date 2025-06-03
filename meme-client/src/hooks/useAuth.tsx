@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import axios from "axios"
 import toast from "react-hot-toast"
-import { useMemeStore } from "../store/useMemeStore"
+import { useMemeStore } from "../store/useMemeStore.ts"
 
 interface LoginData {
   username: string
@@ -53,7 +53,19 @@ const useAuth = () => {
 
       toast.success("Successfully logged in!")
       localStorage.setItem('user', JSON.stringify(response.data));
+      
+      // Initialize WebSocket connection
       useMemeStore.getState().connectWebSocket();
+      
+      // Fetch user profile and store it in global state
+      if (response.data && response.data.username) {
+        try {
+          await useMemeStore.getState().fetchUserProfile(response.data.username);
+        } catch (profileError) {
+          console.error("Error fetching initial user profile:", profileError);
+        }
+      }
+      
       return response.data
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
@@ -78,7 +90,19 @@ const useAuth = () => {
 
       toast.success("Successfully registered!")
       localStorage.setItem('user', JSON.stringify(response.data));
+      
+      // Initialize WebSocket connection
       useMemeStore.getState().connectWebSocket();
+      
+      // Fetch user profile and store it in global state
+      if (response.data && response.data.username) {
+        try {
+          await useMemeStore.getState().fetchUserProfile(response.data.username);
+        } catch (profileError) {
+          console.error("Error fetching initial user profile:", profileError);
+        }
+      }
+      
       return response.data
     } catch (err) {
       if (axios.isAxiosError(err) && err.response) {
@@ -151,7 +175,22 @@ const useAuth = () => {
     })
 
     localStorage.removeItem("user")
+    // Reset WebSocket connection
     useMemeStore.getState().disconnectWebSocket();
+    // Reset user profile state
+    useMemeStore.setState({
+      loggedInUserProfile: null,
+      isLoggedInUserProfileLoaded: false,
+      profilePictureUrl: "",
+      userName: "",
+      userMemes: [],
+      likedMemes: [],
+      savedMemes: [],
+      Followers: [],
+      Following: [],
+      followersCount: 0,
+      followingCount: 0,
+    });
     toast.success("Successfully logged out!")
   } catch (error) {
     toast.error("Failed to log out. Please try again.")

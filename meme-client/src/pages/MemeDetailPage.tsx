@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useMemeStore } from "../store/useMemeStore";
+import { useMemeStore } from "../store/useMemeStore.ts";
 import {
   Heart,
   Bookmark,
@@ -43,6 +43,8 @@ const MemeDetailPage: React.FC = () => {
     joinPostSession,
     leavePostSession,
     wsClient,
+    // loggedInUserProfile,
+    isLoggedInUserProfileLoaded,
   } = useMemeStore();
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -69,8 +71,13 @@ const MemeDetailPage: React.FC = () => {
       if (id) {
         joinPostSession(id);
         await fetchMemeById(id);
-        if (user.userId) {
+        
+        // Only fetch user profile if it's not already loaded in the global state
+        if (user.userId && !isLoggedInUserProfileLoaded) {
+          console.log("MemeDetailPage: Fetching user profile from API");
           await fetchUserProfile(user.username);
+        } else if (user.userId && isLoggedInUserProfileLoaded) {
+          console.log("MemeDetailPage: Using cached user profile from global state");
         }
       }
     };
@@ -81,7 +88,7 @@ const MemeDetailPage: React.FC = () => {
         leavePostSession(id);
       }
     };
-  }, [id, fetchMemeById, fetchUserProfile, user.userId, joinPostSession, leavePostSession]);
+  }, [id, fetchMemeById, fetchUserProfile, user.userId, joinPostSession, leavePostSession, isLoggedInUserProfileLoaded]);
 
   useEffect(() => {
     if (videoRef.current && isVideo) {
@@ -199,7 +206,12 @@ const MemeDetailPage: React.FC = () => {
 
   const navigateToProfile = (username: string) => {
     navigate(`/profile/${username}`);
-    fetchUserProfile(username);
+    
+    // Only fetch the profile if it's not the logged-in user's profile or if the logged-in user's profile is not loaded
+    const isOwnProfile = username === user.username;
+    if (!isOwnProfile || !isLoggedInUserProfileLoaded) {
+      fetchUserProfile(username);
+    }
   };
 
   const sortedComments = meme.comments

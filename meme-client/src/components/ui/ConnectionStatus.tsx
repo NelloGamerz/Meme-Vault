@@ -30,7 +30,7 @@ export const ConnectionStatus: React.FC = memo(() => {
         // Also try to reconnect the meme store WebSocket
         const user = JSON.parse(localStorage.getItem("user") || "{}");
         if (user && user.userId) {
-          import("../../store/useMemeStore").then(({ useMemeStore }) => {
+          import("../../store/useMemeStore.ts").then(({ useMemeStore }) => {
             useMemeStore.getState().connectWebSocket();
           }).catch(err => {
             console.error("Error importing useMemeStore:", err);
@@ -69,17 +69,44 @@ export const ConnectionStatus: React.FC = memo(() => {
     };
   }, []);
 
-  // Handle visibility changes to update connection status
+  // Handle visibility changes and page load to update connection status
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        console.log('Page became visible, checking WebSocket connection');
         checkAndReconnect();
       }
     };
     
+    // Function to handle page load/refresh
+    const handlePageLoad = () => {
+      console.log('Page loaded/refreshed, ensuring WebSocket connection');
+      // Force reconnection on page load
+      const wsStore = useWebSocketStore.getState();
+      wsStore.restoreConnection();
+      
+      // Also reconnect the meme store WebSocket
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      if (user && user.userId) {
+        import("../../store/useMemeStore.ts").then(({ useMemeStore }) => {
+          useMemeStore.getState().connectWebSocket();
+        }).catch(err => {
+          console.error("Error importing useMemeStore:", err);
+        });
+      }
+    };
+    
+    // Add event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('load', handlePageLoad);
+    
+    // Call handlePageLoad immediately to ensure connection on component mount
+    // This is crucial for reconnection after page refresh
+    handlePageLoad();
+    
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('load', handlePageLoad);
     };
   }, []);
 

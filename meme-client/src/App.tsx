@@ -12,6 +12,8 @@ import { ExplorePage } from './pages/ExplorePage';
 import { CreatePage } from './pages/CreatePage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { WebSocketManager } from './components/websocket/WebSocketManager';
+import { UserProfileInitializer } from './components/auth/UserProfileInitializer';
 import './styles/notifications.css';
 
 const RedirectToProfile = () => {
@@ -31,6 +33,12 @@ const ProtectedLayout = ({ children }: { children: React.ReactNode }) => {
 function App() {
   return (
     <>
+      {/* WebSocketManager to establish and maintain WebSocket connection at app level */}
+      <WebSocketManager />
+      
+      {/* UserProfileInitializer to fetch user profile once on app load */}
+      <UserProfileInitializer />
+      
       <Routes>
         <Route path="/forgot-password" element={<ForgotPasswordForm />} />
         <Route path="/reset-password" element={<PasswordResetPage />} />

@@ -1,12 +1,10 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import { Bell } from "lucide-react"
-import { useMemeStore } from "../store/useMemeStore"
+import { useMemeStore } from "../store/useMemeStore.ts"
 import { MemeCard } from "../components/mainPage/MemeCard"
 import { useWebSocketStore } from "../hooks/useWebSockets"
 import { useNavigate } from "react-router-dom"
-import api from "../hooks/api"
-import { ApiNotifications } from "../types/mems"
 
 export const MainPage: React.FC = () => {
   const {
@@ -23,25 +21,9 @@ export const MainPage: React.FC = () => {
 
   // WebSocket connection is now handled in the Layout component
 
-  // Fetch notifications to get unread count
-  const fetchNotificationCount = async () => {
-    try {
-      if (!userName) return
-      
-      const response = await api.get(`/notifications/${userName}`)
-      const unreadNotifications = response.data.filter((notification: ApiNotifications) => !notification.read)
-      setUnreadCount(unreadNotifications.length)
-    } catch (error) {
-      console.error('Error fetching notifications:', error)
-    }
-  }
-
   useEffect(() => {
     fetchMemes()
-    if (userName) {
-      fetchNotificationCount()
-    }
-  }, [fetchMemes, userName])
+  }, [fetchMemes])
   
   // Handle WebSocket notifications
   useEffect(() => {
@@ -51,13 +33,8 @@ export const MainPage: React.FC = () => {
         // Handle all notification types
         if (data.type === 'FOLLOW' || data.type === 'FOLLOW_REQUEST' || 
             data.type === 'LIKE' || data.type === 'COMMENT') {
-          // Refresh notification count when we receive any notification
-          if (userName) {
-            fetchNotificationCount()
-          } else {
-            // Fallback if userName is not available
-            setUnreadCount(prev => prev + 1)
-          }
+          // Increment notification count when we receive any notification
+          setUnreadCount(prev => prev + 1)
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error)
@@ -70,7 +47,7 @@ export const MainPage: React.FC = () => {
         wsClient.removeEventListener('message', handleWebSocketMessage)
       }
     }
-  }, [wsClient, userName])
+  }, [wsClient])
 
   return (
     <div className="py-6">

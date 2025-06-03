@@ -1,6 +1,6 @@
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { useMemeStore } from "../../store/useMemeStore"
+import { useMemeStore } from "../../store/useMemeStore.ts"
 import { MemeCard } from "./MemeCard"
 import { toast } from "react-hot-toast"
 import {
@@ -151,17 +151,96 @@ export const ProfilePage: React.FC = () => {
   const [followingLoading, setFollowingLoading] = useState(false)
   const [isFollowingModalOpen, setIsFollowingModalOpen] = useState(false)
 
-  // Fetch the profile data when the component mounts or when the userId changes
+  // Get the loggedInUserProfile from the global state
+  const loggedInUserProfile = useMemeStore(state => state.loggedInUserProfile);
+  const isLoggedInUserProfileLoaded = useMemeStore(state => state.isLoggedInUserProfileLoaded);
+  
+  // Reference to track if we've initiated profile loading
+  const profileLoadingInitiatedRef = useRef(false);
+  
+  // State to track the currently displayed profile username
+  const [displayedUsername, setDisplayedUsername] = useState<string | null>(null);
+  
+  // Get the profile cache from the store
+  const profileCache = useMemeStore(state => state.profileCache);
+  
+  // Fetch the profile data when the component mounts or when the username changes
   useEffect(() => {
-    if (username) {
-      console.log("ProfilePage: Fetching profile for username:", username);
-      console.log("ProfilePage: isOwnProfile:", isOwnProfile);
-      console.log("ProfilePage: loggedInUser:", loggedInUser);
+    if (!username) return;
+    
+    // Always ensure we're displaying the correct profile for the URL
+    // This is critical for page refreshes
+    if (displayedUsername !== username) {
+      console.log(`ProfilePage: URL username (${username}) doesn't match displayed username (${displayedUsername}), forcing profile update`);
       
-      // This will fetch the profile data for the userId in the URL
+      // Force the store to display the profile for the URL username
+      // This prevents the logged-in user profile from showing after refresh
+      if (!isOwnProfile) {
+        useMemeStore.setState({
+          viewedUserName: username, // Set to URL username to prevent flashing
+        });
+      }
+      
+      setDisplayedUsername(username);
+      profileLoadingInitiatedRef.current = false; // Reset to allow loading
+    }
+    
+    // Check if we already have this profile in the cache
+    const cachedProfile = profileCache[username];
+    const isCacheValid = cachedProfile && 
+                        (Date.now() - cachedProfile.timestamp < 5 * 60 * 1000);
+    
+    // If we're already loading, don't fetch again
+    if (profileLoadingInitiatedRef.current) {
+      console.log("ProfilePage: Profile loading already initiated");
+      return;
+    }
+    
+    console.log("ProfilePage: Checking profile for username:", username);
+    console.log("ProfilePage: isOwnProfile:", isOwnProfile);
+    console.log("ProfilePage: Cache status:", isCacheValid ? "Valid cache" : "No valid cache");
+    
+    // Set the flag to prevent duplicate fetches
+    profileLoadingInitiatedRef.current = true;
+    
+    // If we have a valid cache or it's the user's own profile and already loaded, we don't need to fetch
+    if (isCacheValid || (isOwnProfile && isLoggedInUserProfileLoaded && loggedInUserProfile)) {
+      console.log("ProfilePage: Using cached profile");
+      
+      // Even with cache, ensure the correct profile is displayed
+      if (cachedProfile) {
+        console.log("ProfilePage: Applying cached profile data to ensure correct display");
+        if (isOwnProfile) {
+          useMemeStore.setState({
+            userName: cachedProfile.profile.username,
+            profilePictureUrl: cachedProfile.profile.profilePictureUrl,
+            viewedUserName: cachedProfile.profile.username,
+            viewedProfilePictureUrl: cachedProfile.profile.profilePictureUrl,
+            userMemes: cachedProfile.memes,
+          });
+        } else {
+          useMemeStore.setState({
+            viewedUserName: cachedProfile.profile.username,
+            viewedProfilePictureUrl: cachedProfile.profile.profilePictureUrl,
+            Followers: cachedProfile.profile.followers,
+            Following: cachedProfile.profile.following,
+            followersCount: cachedProfile.profile.followersCount,
+            followingCount: cachedProfile.profile.followingCount,
+            userMemes: cachedProfile.memes,
+          });
+        }
+      }
+    } else {
+      // This will fetch the profile data for the username in the URL
+      console.log("ProfilePage: Fetching profile from API");
       fetchUserProfile(username);
     }
-  }, [fetchUserProfile, username])
+    
+    // Reset the flag when the component unmounts or username changes
+    return () => {
+      profileLoadingInitiatedRef.current = false;
+    };
+  }, [fetchUserProfile, username, isOwnProfile, isLoggedInUserProfileLoaded, loggedInUserProfile, profileCache, displayedUsername])
   
   // Debug effect to log followers and following data when they change
   useEffect(() => {
@@ -232,7 +311,13 @@ export const ProfilePage: React.FC = () => {
     try {
       // Always use the logged-in user's profile picture for uploads
       await uploadMeme(selectedFile, title, profilePictureUrl, loggedInUser.userId)
-      fetchUserProfile(username || "")
+      
+      // Refresh the profile data to show the new meme
+      if (isOwnProfile) {
+        console.log("ProfilePage: Refreshing profile after meme upload");
+        fetchUserProfile(username || "")
+      }
+      
       setIsUploadModalOpen(false)
       resetUpload()
       toast.success("Meme uploaded successfully!")
@@ -261,7 +346,12 @@ export const ProfilePage: React.FC = () => {
 
     try {
       await updateProfilePicture(selectedProfilePicture, loggedInUser.userId)
+      
+      // Always fetch the profile after updating the profile picture
+      // This is necessary to update the cached profile in the global state
+      console.log("ProfilePage: Refreshing profile after profile picture update");
       fetchUserProfile(username || "")
+      
       setProfilePreviewUrl(null)
       setSelectedProfilePicture(null)
       setIsProfilePictureModalOpen(false)
@@ -276,7 +366,12 @@ export const ProfilePage: React.FC = () => {
     if (!editName.trim()) return
     try {
       await updateUserName(loggedInUser.userId, editName)
+      
+      // Always fetch the profile after updating the username
+      // This is necessary to update the cached profile in the global state
+      console.log("ProfilePage: Refreshing profile after username update");
       fetchUserProfile(username || "")
+      
       setIsEditProfileModalOpen(false)
       toast.success("Profile updated successfully!")
     } catch (error) {
@@ -400,7 +495,7 @@ export const ProfilePage: React.FC = () => {
     try {
       // Use the handleFollowToggle function from useMemeStore
       // This will handle the WebSocket connection internally
-      await handleFollowToggle(username, isFollowing)
+      await handleFollowToggle(isFollowing)
       
       // Don't refresh the profile data - rely on WebSocket updates and optimistic UI updates
       console.log("ProfilePage: Relying on optimistic UI updates for follow/unfollow");
@@ -424,6 +519,26 @@ export const ProfilePage: React.FC = () => {
   console.log("ProfilePage: Rendering with isOwnProfile:", isOwnProfile);
   console.log("ProfilePage: viewedUserName:", viewedUserName);
   console.log("ProfilePage: userName:", userName);
+  
+  // Determine if we have the correct profile data loaded
+  const isCorrectProfileLoaded = isOwnProfile 
+    ? !!userName 
+    : viewedUserName === username;
+  
+  // Get loading state from the store
+  const isStoreLoading = useMemeStore(state => state.isLoading);
+  
+  // Only show full-page loading on initial load when we have no data
+  const showFullPageLoading = isStoreLoading && !isCorrectProfileLoaded;
+  
+  // If we're still loading and don't have the correct profile data, show a minimal loading indicator
+  if (showFullPageLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen bg-gray-50">

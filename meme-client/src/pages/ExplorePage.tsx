@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useMemeStore } from '../store/useMemeStore';
+import { useMemeStore } from '../store/useMemeStore.ts';
 import { MemeCard } from '../components/mainPage/MemeCard';
 import { Search, X } from 'lucide-react';
 
