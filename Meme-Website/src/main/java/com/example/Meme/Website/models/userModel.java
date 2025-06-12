@@ -2,6 +2,7 @@ package com.example.Meme.Website.models;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -36,6 +37,11 @@ public class userModel {
     private List<Meme> LikedMemes;
     @DBRef(lazy = false)
     private List<Meme> savedMemes;
+
+    private List<String> seenMemes;
+
+    private String feedStage = "NEW";
+    private Map<String, Integer> tagInteractions;
     private String profilePictureUrl;
     private Long FollowersCount;
     private Long FollowingCount;

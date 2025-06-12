@@ -34,10 +34,10 @@ public class ProfileController {
         return profileService.getFollowers(userId);
     }
 
-    @PostMapping("/{userId}/follow/{targetUserId}")
-    public ResponseEntity<?> followUser(@PathVariable String userId, @PathVariable String targetUserId, @RequestBody Map<String, Boolean> requestBody ) {
-        return profileService.followUser(userId, targetUserId, requestBody);
-    }
+    // @PostMapping("/{userId}/follow/{targetUserId}")
+    // public ResponseEntity<?> followUser(@PathVariable String userId, @PathVariable String targetUserId, @RequestBody Map<String, Boolean> requestBody ) {
+    //     return profileService.followUser(userId, targetUserId, requestBody);
+    // }
 
     @GetMapping("/{userId}/following")
     public ResponseEntity<?> getFollowing(@PathVariable String userId) {

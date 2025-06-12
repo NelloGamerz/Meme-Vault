@@ -4,8 +4,10 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -15,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+// import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.socket.TextMessage;
@@ -24,6 +27,7 @@ import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.example.Meme.Website.WebSockets.WebSocketSessionManager;
 import com.example.Meme.Website.models.Comments;
+import com.example.Meme.Website.models.FollowersModel;
 import com.example.Meme.Website.models.Meme;
 import com.example.Meme.Website.models.userModel;
 import com.example.Meme.Website.repository.commentRepository;
@@ -56,29 +60,187 @@ public class memeService {
     @Autowired
     private NotificationService notificationService;
 
+    // @Transactional
+    // public ResponseEntity<List<Meme>> getAllMemes() {
+    // List<Meme> memes = redisService.getList("AllMemes", Meme.class);
+
+    // if (memes != null && !memes.isEmpty()) {
+    // System.out.println("✅ Returning memes from Redis cache");
+    // return ResponseEntity.ok(memes);
+    // }
+
+    // memes = memeRepository.findAll();
+
+    // if (!memes.isEmpty()) {
+    // redisService.set("AllMemes", memes, 10, TimeUnit.MINUTES);
+    // System.out.println("🔄 Caching memes in Redis for 10 minutes");
+    // }
+
+    // return ResponseEntity.ok(memes);
+    // }
 
     @Transactional
-    public ResponseEntity<List<Meme>> getAllMemes() {
-        List<Meme> memes = redisService.getList("AllMemes", Meme.class);
+    public ResponseEntity<List<Meme>> getUserFeed(String userId, boolean excludeComments) {
+        Optional<userModel> optionalUser = userRepository.findByUserId(userId);
+        if (optionalUser.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.emptyList());
+        }
 
+        userModel user = optionalUser.get();
+        List<Meme> feed;
+
+        switch (user.getFeedStage()) {
+            case "FOLLOWING_ONLY":
+                feed = getFollowingMemes(user, excludeComments);
+                break;
+
+            case "INTERACTIVE":
+                feed = getPersonalizedMemes(user, excludeComments);
+                break;
+
+            case "NEW":
+                feed = getAllMemes(excludeComments);
+                break;
+            default:
+                feed = getTrendingMemesFromCache(excludeComments);
+                break;
+        }
+        return ResponseEntity.ok(feed);
+    }
+
+    // @Transactional
+    // public ResponseEntity<List<Meme>> getUserFeed(String userId) {
+    // if (userId == null || userId.trim().isEmpty()) {
+    // return
+    // ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.emptyList());
+    // }
+
+    // Optional<userModel> optionalUser = userRepository.findByUserId(userId);
+    // if (optionalUser.isEmpty()) {
+    // return
+    // ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.emptyList());
+    // }
+
+    // userModel user = optionalUser.get();
+
+    // // Null-safe seen memes
+    // Set<String> seen = user.getSeenMemes() != null
+    // ? new HashSet<>(user.getSeenMemes())
+    // : new HashSet<>();
+
+    // // Null-safe meme source lists
+    // List<Meme> followingMemes =
+    // Optional.ofNullable(getFollowingMemes(user)).orElseGet(ArrayList::new);
+    // List<Meme> personalizedMemes =
+    // Optional.ofNullable(getPersonalizedMemes(user)).orElseGet(ArrayList::new);
+    // List<Meme> trendingMemes =
+    // Optional.ofNullable(getTrendingMemesFromCache()).orElseGet(ArrayList::new);
+    // List<Meme> newMemes =
+    // Optional.ofNullable(getAllMemes()).orElseGet(ArrayList::new);
+
+    // // Defensive interleaving
+    // Set<String> memeIds = new HashSet<>();
+    // List<Meme> feed = new ArrayList<>();
+
+    // List<List<Meme>> sources = List.of(followingMemes, personalizedMemes,
+    // trendingMemes, newMemes);
+    // int maxSize = sources.stream().mapToInt(List::size).max().orElse(0);
+
+    // for (int i = 0; i < maxSize && feed.size() < 30; i++) {
+    // for (List<Meme> source : sources) {
+    // if (i < source.size()) {
+    // Meme meme = source.get(i);
+    // if (meme != null && meme.getId() != null
+    // && !seen.contains(meme.getId())
+    // && memeIds.add(meme.getId())) {
+    // feed.add(meme);
+    // }
+    // }
+    // }
+    // }
+
+    // // Shuffle and trim to 30
+    // Collections.shuffle(feed);
+    // if (feed.size() > 30) {
+    // feed = feed.subList(0, 30);
+    // }
+
+    // return ResponseEntity.ok(feed);
+    // }
+
+    private List<Meme> getAllMemes(boolean excludeComments) {
+        List<Meme> memes = memeRepository.findAll();
+        if (excludeComments) {
+            memes.forEach(meme -> meme.setComments(null));
+        }
+        return memes;
+    }
+
+    private List<Meme> getTrendingMemesFromCache(boolean excludeComments) {
+        List<Meme> memes = redisService.getList("TrendingMemes", Meme.class);
         if (memes != null && !memes.isEmpty()) {
-            System.out.println("✅ Returning memes from Redis cache");
-            return ResponseEntity.ok(memes);
+            System.out.println("✅ Returning trending memes from Redis cache");
+            return memes;
         }
 
-        memes = memeRepository.findAll();
+        memes = memeRepository.findTopByOrderByLikecountDesc();
+        redisService.set("TrendingMemes", memes, 10, TimeUnit.MINUTES);
+        System.out.println("🔄 Caching trending memes in Redis for 10 minutes");
+        return memes;
+    }
 
-        if (!memes.isEmpty()) {
-            redisService.set("AllMemes", memes, 10, TimeUnit.MINUTES);
-            System.out.println("🔄 Caching memes in Redis for 10 minutes");
-        }
+    private List<Meme> getFollowingMemes(userModel user, boolean excludeComments) {
+        Set<String> seen = new HashSet<>(user.getSeenMemes());
+        List<String> followersUserId = user.getFollowers().stream()
+                .map(FollowersModel::getUserId)
+                .collect(Collectors.toList());
 
-        return ResponseEntity.ok(memes);
+        return memeRepository.findByUploaderIn(followersUserId).stream()
+                .filter(meme -> !seen.contains(meme.getId()))
+                .sorted(Comparator.comparing(Meme::getMemeCreated).reversed())
+                .limit(30)
+                .collect(Collectors.toList());
+    }
+
+    // private List<Meme> getPersonalizedMemes(userModel user) {
+    // Set<String> seen = new HashSet<>(user.getSeenMemes());
+
+    // List<String> topTags = user.getTagInteractions().entrySet().stream()
+    // .sorted((a, b) -> b.getValue() - a.getValue())
+    // .map(Map.Entry::getKey)
+    // .limit(5)
+    // .toList();
+
+    // return memeRepository.findByTagsIn(topTags).stream()
+    // .filter(meme -> !seen.contains(meme.getId()))
+    // .sorted(Comparator.comparing(Meme::getMemeCreated).reversed())
+    // .limit(30)
+    // .collect(Collectors.toList());
+    // }
+
+    private List<Meme> getPersonalizedMemes(userModel user, boolean excludeComments) {
+        Set<String> seen = new HashSet<>(user.getSeenMemes());
+
+        // Safely handle null tagInteractions map
+        Map<String, Integer> tagInteractions = Optional.ofNullable(user.getTagInteractions())
+                .orElse(Collections.emptyMap());
+
+        List<String> topTags = tagInteractions.entrySet().stream()
+                .sorted((a, b) -> b.getValue() - a.getValue())
+                .map(Map.Entry::getKey)
+                .limit(5)
+                .toList();
+
+        return memeRepository.findByTagsIn(topTags).stream()
+                .filter(meme -> !seen.contains(meme.getId()))
+                .sorted(Comparator.comparing(Meme::getMemeCreated).reversed())
+                .limit(30)
+                .collect(Collectors.toList());
     }
 
     @Transactional
-    public ResponseEntity<Optional<Meme>> getUserUploadedMemes(String userId) {
-        Optional<Meme> memes = memeRepository.findById(userId);
+    public ResponseEntity<List<Meme>> getUserUploadedMemes(String username) {
+        List<Meme> memes = memeRepository.findByUploader(username);
         if (memes.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -92,6 +254,41 @@ public class memeService {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(meme.get());
+    }
+
+    // @Transactional
+    // public ResponseEntity<?> getMemeComments(String id, int page, int limit) {
+    // Optional<Meme> optMeme = memeRepository.findById(id);
+    // if (optMeme.isEmpty()) {
+    // return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Meme not found");
+    // }
+
+    // Meme meme = optMeme.get();
+    // List<Comments> allComments = meme.getComments();
+
+    // int start = (page - 1) * limit;
+    // int end = Math.min(start + limit, allComments.size());
+
+    // if (start >= allComments.size()) {
+    // return ResponseEntity.ok(Collections.emptyList());
+    // }
+    // List<Comments> paginatedComments = allComments.subList(start, end);
+    // return ResponseEntity.ok(paginatedComments);
+    // }
+
+    @Transactional
+    public ResponseEntity<?> getMemeComments(String memeId, int page, int limit) {
+        PageRequest pageable = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Page<Comments> commentPage = commentRepository.findByMemeId(memeId, pageable);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("data", commentPage.getContent());
+        response.put("currentPage", commentPage.getNumber() + 1);
+        // response.put("totalItems", commentPage.getTotalElements());
+        response.put("totalPages", commentPage.getTotalPages());
+
+        return ResponseEntity.ok(response);
     }
 
     @Transactional
@@ -139,14 +336,15 @@ public class memeService {
                     message = "Meme liked successfully";
                     System.out.println("Meme liked by user: " + username);
 
-                    if(!username.equals(meme.getUploader())){
+                    if (!username.equals(meme.getUploader())) {
                         String sender = username;
                         String recepient = meme.getUploader();
                         String type = "LIKE";
                         String notificationMessage = sender + " liked your meme";
                         String profilePictureUrl = user.getProfilePictureUrl();
                         String memeIdForNotification = meme.getId();
-                        notificationService.sendNotification(sender, recepient, type, notificationMessage, profilePictureUrl, memeIdForNotification);
+                        notificationService.sendNotification(sender, recepient, type, notificationMessage,
+                                profilePictureUrl, memeIdForNotification);
                     }
                 } else {
                     message = "Meme already liked";
@@ -288,8 +486,8 @@ public class memeService {
             userModel user = optionalUser.get();
 
             // 🔹 Save meme details in MongoDB
-            Meme meme = new Meme(null, user.getUserId(), mediaUrl, mediaType, caption, uploader, 0, 0, new Date(),
-                    new ArrayList<>(), profilePictureUrl);
+            Meme meme = new Meme(null, user.getUserId(), mediaUrl, mediaType, caption, uploader, 0, 0, new Date(), 0,
+                    new ArrayList<>(), new ArrayList<>(), profilePictureUrl);
             memeRepository.save(meme);
 
             // 🔹 Store meme ID in user's meme list
@@ -309,21 +507,39 @@ public class memeService {
         }
     }
 
+    // @Transactional
+    // public ResponseEntity<?> getAllLikedMemes(String username, boolean
+    // excludeComments) {
+    // Optional<userModel> optionalUser = userRepository.findByUsername(username);
+    // if (optionalUser.isEmpty()) {
+    // return ResponseEntity.badRequest().body("User not found");
+    // }
+
+    // userModel user = optionalUser.get();
+    // List<Meme> LikedMemes = user.getLikedMemes();
+
+    // return ResponseEntity.ok(LikedMemes);
+    // }
+
     @Transactional
-    public ResponseEntity<?> getAllLikedMemes(String username) {
+    public ResponseEntity<?> getAllLikedMemes(String username, boolean excludeComments) {
         Optional<userModel> optionalUser = userRepository.findByUsername(username);
         if (optionalUser.isEmpty()) {
             return ResponseEntity.badRequest().body("User not found");
         }
 
         userModel user = optionalUser.get();
-        List<Meme> LikedMemes = user.getLikedMemes();
+        List<Meme> likedMemes = user.getLikedMemes();
 
-        return ResponseEntity.ok(LikedMemes);
+        if (excludeComments) {
+            likedMemes.forEach(meme -> meme.setComments(null));
+        }
+
+        return ResponseEntity.ok(likedMemes);
     }
 
     @Transactional
-    public ResponseEntity<?> getAllSavedMemes(String username) {
+    public ResponseEntity<?> getAllSavedMemes(String username, boolean excludeCommments) {
         Optional<userModel> optionalUser = userRepository.findByUsername(username);
         if (optionalUser.isEmpty()) {
             return ResponseEntity.badRequest().body("User not found");
@@ -331,6 +547,10 @@ public class memeService {
 
         userModel user = optionalUser.get();
         List<Meme> savedMemes = user.getSavedMemes();
+
+        if (excludeCommments) {
+            savedMemes.forEach(meme -> meme.setComments(null));
+        }
 
         return ResponseEntity.ok(savedMemes);
     }
@@ -360,6 +580,7 @@ public class memeService {
         }
 
         meme.getComments().add(savedComment);
+        meme.setCommentsCount(meme.getCommentsCount() + 1);
         Meme updatedMeme = memeRepository.save(meme);
         System.out.println("Updated meme with new comment. Meme ID: " + updatedMeme.getId());
 
@@ -406,25 +627,27 @@ public class memeService {
             System.out.println("Post owner WebSocket session not found or not open for user ID: " + ownerId);
         }
 
-        if(!comment.getUsername().equals(meme.getUploader())){
+        if (!comment.getUsername().equals(meme.getUploader())) {
             String sender = comment.getUsername();
             String recepient = meme.getUploader();
             String type = "COMMENT";
             String notificationMessage = sender + " commented on your meme: " + meme.getCaption();
             String profilePictureUrl = comment.getProfilePictureUrl();
             String memeId = comment.getMemeId();
-            notificationService.sendNotification(sender, recepient, type, notificationMessage, profilePictureUrl, memeId);
+            notificationService.sendNotification(sender, recepient, type, notificationMessage, profilePictureUrl,
+                    memeId);
         }
 
         System.out.println("Finished addCommentsToMeme(). Returning saved comment.");
         return savedComment;
     }
 
-    @Transactional
-    public ResponseEntity<List<Comments>> getMemeComments(String memeId) {
-        List<Comments> comments = commentRepository.findByMemeId(memeId);
-        return ResponseEntity.ok(comments); // Always return 200 OK with the list (even if empty)
-    }
+    // @Transactional
+    // public ResponseEntity<List<Comments>> getMemeComments(String memeId) {
+    // List<Comments> comments = commentRepository.findByMemeId(memeId);
+    // return ResponseEntity.ok(comments); // Always return 200 OK with the list
+    // (even if empty)
+    // }
 
     @Transactional
     public ResponseEntity<?> getUserData(String username) {

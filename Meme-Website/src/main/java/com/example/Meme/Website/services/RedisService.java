@@ -34,15 +34,15 @@ public class RedisService {
         }
     }
 
-    public void set(String key, Object o, Long till) {
-        try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            String jsonvalue = objectMapper.writeValueAsString(o);
-            redisTemplate.opsForValue().set(key, jsonvalue, till, TimeUnit.SECONDS);
-        } catch (Exception e) {
-            log.error("Exception " + e);
-        }
-    }
+    // public void set(String key, Object o, Long till) {
+    //     try {
+    //         ObjectMapper objectMapper = new ObjectMapper();
+    //         String jsonvalue = objectMapper.writeValueAsString(o);
+    //         redisTemplate.opsForValue().set(key, jsonvalue, till, TimeUnit.SECONDS);
+    //     } catch (Exception e) {
+    //         log.error("Exception " + e);
+    //     }
+    // }
 
     // ✅ Store any object in Redis as JSON
     public void set(String key, Object o, long time, TimeUnit unit) {
@@ -111,6 +111,16 @@ public class RedisService {
         }
     }
 
+    public void deleteKey(String key){
+        try{
+            redisTemplate.delete(key);
+            log.info("Key '{}' deleted from Redis", key);
+        }
+        catch(Exception e){
+            log.error("Error deleting key '{}' from Redis: {}", key, e.getMessage());
+        }
+    }
+
     public boolean tokenExists(String keyPrefix, String username){
         try{
             String key = key(keyPrefix, username);
@@ -123,7 +133,7 @@ public class RedisService {
 
     }
 
-    public String key(String keyPrefix, String username){
-        return keyPrefix + ":" + username;
+    public String key(String Prefix, String Suffix){
+        return Prefix + ":" + Suffix;
     }
 }

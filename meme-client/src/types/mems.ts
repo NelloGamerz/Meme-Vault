@@ -28,7 +28,8 @@ export interface UserApi{
 
 export interface Meme {
   id: string;
-  url: string;
+  url?: string;
+  mediaUrl?: string; // Added to handle API response format
   title: string;
   uploadedBy?: string;
   uploadDate?: Date;
@@ -36,6 +37,7 @@ export interface Meme {
   comments: Comment[];
   likeCount: number;
   saveCount: number;
+  commentsCount: number;
   uploader: string;
   profilePictureUrl: string;
   userId: string;
@@ -62,6 +64,7 @@ export interface ApiMeme {
   comments?: Comment[];
   likecount: number;
   saveCount: number;
+  commentsCount: number;
   uploader: string;
   profilePictureUrl: string;
   userId: string,
@@ -130,12 +133,16 @@ export interface ApiNotifications{
 export interface Notification{
   id: string,
   userId: string;
-  senderUsername: string;
-  profilePictureUrl: string;
+  senderUsername?: string;
+  profilePictureUrl?: string;
   type: string;
   message: string;
   createdAt: Date;
-  read: boolean;
+  read?: boolean;
   isRead: boolean;
   memeId?: string;
+  targetId?: string;
+  sourceUserId?: string;
+  sourceUsername?: string;
+  sourceProfilePictureUrl?: string;
 }

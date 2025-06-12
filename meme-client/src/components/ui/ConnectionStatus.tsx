@@ -24,13 +24,17 @@ export const ConnectionStatus: React.FC = memo(() => {
         console.log("Connection status check: Not connected, attempting to restore connection");
         WebSocketService.restoreConnection();
         
-        // Also try to reconnect the meme store WebSocket
+        // Also try to reconnect the WebSocket connection store
         const user = JSON.parse(localStorage.getItem("user") || "{}");
         if (user && user.userId) {
-          import("../../store/useMemeStore.ts").then(({ useMemeStore }) => {
-            useMemeStore.getState().connectWebSocket();
+          import("../../store/useWebSocketConnectionStore.ts").then((module) => {
+            // Explicitly type the store to include the connectWebSocket method
+            const store = module.useWebSocketConnectionStore.getState() as {
+              connectWebSocket: () => void;
+            };
+            store.connectWebSocket();
           }).catch(err => {
-            console.error("Error importing useMemeStore:", err);
+            console.error("Error importing useWebSocketConnectionStore:", err);
           });
         }
       }

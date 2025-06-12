@@ -211,10 +211,8 @@ public class ProfileService {
 
         userProfile.put("userId", user.getUserId());
         userProfile.put("username", user.getUsername());
-        // userProfile.put("email", user.getEmail());
         userProfile.put("profilePictureUrl", user.getProfilePictureUrl());
         userProfile.put("userCreated", user.getUserCreated());
-        // userProfile.put("userUpdated", user.getUserUpdated());
         userProfile.put("memeList", user.getMemeList());
         userProfile.put("savedMemes", user.getSavedMemes());
         userProfile.put("likedMemes", user.getLikedMemes());
@@ -224,7 +222,6 @@ public class ProfileService {
         userProfile.put("followersCount", user.getFollowers().size());
 
         return ResponseEntity.ok(userProfile);
-        // return ResponseEntity.ok(user.get());
     }
 
     @Transactional
@@ -305,199 +302,6 @@ public class ProfileService {
 
         return ResponseEntity.ok(followingList);
     }
-
-    @Transactional
-    public ResponseEntity<?> followUser(String userId, String targetUserId, Map<String, Boolean> requestBody) {
-        boolean isFollowing = requestBody.getOrDefault("isFollowing", false);
-        Optional<userModel> userOpt = userRepository.findById(userId);
-        Optional<userModel> targetUserOpt = userRepository.findById(targetUserId);
-
-        if (userOpt.isEmpty() || targetUserOpt.isEmpty()) {
-            return ResponseEntity.status(404).body("User not found.");
-        }
-
-        userModel user = userOpt.get();
-        userModel targetUser = targetUserOpt.get();
-
-        if (isFollowing) {
-            // Unfollow logic
-            user.getFollowing().removeIf(f -> f.getUserId().equals(targetUserId));
-            user.setFollowingCount(Math.max(0, user.getFollowingCount() - 1));
-
-            targetUser.getFollowers().removeIf(f -> f.getUserId().equals(userId));
-            targetUser.setFollowersCount(Math.max(0, targetUser.getFollowersCount() - 1));
-
-            userRepository.save(user);
-            userRepository.save(targetUser);
-
-            return ResponseEntity.ok("Unfollowed successfully.");
-        } else {
-            // Follow logic
-            FollowersModel follower = new FollowersModel(null, userId, user.getUsername(), user.getProfilePictureUrl(),
-                    false);
-            FollowersModel following = new FollowersModel(null, targetUserId, targetUser.getUsername(),
-                    targetUser.getProfilePictureUrl(), false);
-
-            user.getFollowing().add(following);
-            user.setFollowingCount(user.getFollowingCount() + 1);
-
-            targetUser.getFollowers().add(follower);
-            targetUser.setFollowersCount(targetUser.getFollowersCount() + 1);
-
-            userRepository.save(user);
-            userRepository.save(targetUser);
-
-            return ResponseEntity.ok("Followed successfully.");
-        }
-    }
-
-    // @Transactional
-    // public ResponseEntity<?> followUserByUsername(String followerUsername, String
-    // targetUsername,
-    // Map<String, Boolean> requestBody) {
-    // boolean isFollowing = requestBody.getOrDefault("isFollowing", false);
-    // Optional<userModel> followerOpt =
-    // userRepository.findByUsername(followerUsername);
-    // Optional<userModel> targetUserOpt =
-    // userRepository.findByUsername(targetUsername);
-
-    // if (followerOpt.isEmpty() || targetUserOpt.isEmpty()) {
-    // return ResponseEntity.status(404).body("User not found.");
-    // }
-
-    // userModel follower = followerOpt.get();
-    // userModel targetUser = targetUserOpt.get();
-
-    // if (isFollowing) {
-    // // Unfollow logic
-    // follower.getFollowing().removeIf(f ->
-    // f.getUserId().equals(targetUser.getUserId()));
-    // follower.setFollowingCount(Math.max(0, follower.getFollowingCount() - 1));
-
-    // targetUser.getFollowers().removeIf(f ->
-    // f.getUserId().equals(follower.getUserId()));
-    // targetUser.setFollowersCount(Math.max(0, targetUser.getFollowersCount() -
-    // 1));
-
-    // userRepository.save(follower);
-    // userRepository.save(targetUser);
-
-    // return ResponseEntity.ok("Unfollowed successfully.");
-    // } else {
-    // // Follow logic
-    // FollowersModel followerInfo = new FollowersModel(null, follower.getUserId(),
-    // follower.getUsername(),
-    // follower.getProfilePictureUrl(), false);
-    // FollowersModel followingInfo = new FollowersModel(null,
-    // targetUser.getUserId(), targetUser.getUsername(),
-    // targetUser.getProfilePictureUrl(), false);
-
-    // follower.getFollowing().add(followingInfo);
-    // follower.setFollowingCount(follower.getFollowingCount() + 1);
-
-    // targetUser.getFollowers().add(followerInfo);
-    // targetUser.setFollowersCount(targetUser.getFollowersCount() + 1);
-
-    // userRepository.save(follower);
-    // userRepository.save(targetUser);
-
-    // // Send notification
-    // notificationService.sendNotification(
-    // follower.getUsername(),
-    // targetUser.getUsername(),
-    // "FOLLOW",
-    // follower.getUsername() + " started following you");
-
-    // return ResponseEntity.ok("Followed successfully.");
-    // }
-    // }
-
-    // @Transactional
-    // public ResponseEntity<?> followUserByUsername(String followerUsername, String
-    // targetUsername,
-    // Map<String, Boolean> requestBody) {
-    // log.info("Received follow request: follower='{}', target='{}',
-    // requestBody={}", followerUsername,
-    // targetUsername, requestBody);
-
-    // boolean isFollowing = requestBody.getOrDefault("isFollowing", false);
-    // Optional<userModel> followerOpt =
-    // userRepository.findByUsername(followerUsername);
-    // Optional<userModel> targetUserOpt =
-    // userRepository.findByUsername(targetUsername);
-
-    // if (followerOpt.isEmpty() || targetUserOpt.isEmpty()) {
-    // log.warn("User not found: follower='{}' found={}, target='{}' found={}",
-    // followerUsername, followerOpt.isPresent(),
-    // targetUsername, targetUserOpt.isPresent());
-    // return ResponseEntity.status(404).body("User not found.");
-    // }
-
-    // userModel follower = followerOpt.get();
-    // userModel targetUser = targetUserOpt.get();
-
-    // if (isFollowing) {
-    // log.info("'{}' is unfollowing '{}'", followerUsername, targetUsername);
-
-    // // Unfollow logic
-    // long beforeFollowingCount = follower.getFollowingCount();
-    // long beforeFollowersCount = targetUser.getFollowersCount();
-
-    // follower.getFollowing().removeIf(f ->
-    // f.getUserId().equals(targetUser.getUserId()));
-    // follower.setFollowingCount(Math.max(0, beforeFollowingCount - 1));
-
-    // targetUser.getFollowers().removeIf(f ->
-    // f.getUserId().equals(follower.getUserId()));
-    // targetUser.setFollowersCount(Math.max(0, beforeFollowersCount - 1));
-
-    // userRepository.save(follower);
-    // userRepository.save(targetUser);
-
-    // log.info("Unfollow successful: {} -> {}. New counts -
-    // followerFollowingCount={}, targetFollowersCount={}",
-    // followerUsername, targetUsername,
-    // follower.getFollowingCount(), targetUser.getFollowersCount());
-
-    // return ResponseEntity.ok("Unfollowed successfully.");
-    // } else {
-    // log.info("'{}' is following '{}'", followerUsername, targetUsername);
-
-    // // Follow logic
-    // FollowersModel followerInfo = new FollowersModel(null, follower.getUserId(),
-    // follower.getUsername(),
-    // follower.getProfilePictureUrl(), false);
-    // FollowersModel followingInfo = new FollowersModel(null,
-    // targetUser.getUserId(), targetUser.getUsername(),
-    // targetUser.getProfilePictureUrl(), false);
-
-    // follower.getFollowing().add(followingInfo);
-    // follower.setFollowingCount(follower.getFollowingCount() + 1);
-
-    // targetUser.getFollowers().add(followerInfo);
-    // targetUser.setFollowersCount(targetUser.getFollowersCount() + 1);
-
-    // userRepository.save(follower);
-    // userRepository.save(targetUser);
-
-    // log.info("Follow successful: {} -> {}. New counts -
-    // followerFollowingCount={}, targetFollowersCount={}",
-    // followerUsername, targetUsername,
-    // follower.getFollowingCount(), targetUser.getFollowersCount());
-
-    // // Send notification
-    // notificationService.sendNotification(
-    // follower.getUsername(),
-    // targetUser.getUsername(),
-    // "FOLLOW",
-    // follower.getUsername() + " started following you");
-
-    // log.info("Notification sent to '{}': {} started following you",
-    // targetUsername, followerUsername);
-
-    // return ResponseEntity.ok("Followed successfully.");
-    // }
-    // }
 
     @Transactional
     public ResponseEntity<?> followUserByUsername(String followerUsername, String targetUsername, Map<String, Boolean> requestBody) {

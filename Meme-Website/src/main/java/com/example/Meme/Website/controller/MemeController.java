@@ -1,7 +1,6 @@
 package com.example.Meme.Website.controller;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -31,47 +30,39 @@ public class MemeController {
         return memeService.getUserData(username);
     }
 
-
     @GetMapping("/uploaded/{username}")
     public ResponseEntity<?> getUploadedMemesByUsername(@PathVariable String username) {
         return memeService.getUserUploadedMemes(username);
     }
 
-    @GetMapping
-    public ResponseEntity<List<Meme>> getAllMemes() {
-        return memeService.getAllMemes();
+    // @GetMapping
+    // public ResponseEntity<List<Meme>> getAllMemes() {
+    // return memeService.getAllMemes();
+    // }
+
+    @GetMapping()
+    public ResponseEntity<List<Meme>> getuserFeed(
+            @RequestParam String userId,
+            @RequestParam(required = false, defaultValue = "false") boolean excludeComments) {
+        return memeService.getUserFeed(userId, excludeComments);
     }
-
-    @PostMapping("/{memeId}/like")
-    public ResponseEntity<?> toggleLikeMeme(
-            @RequestParam String username,
-            @PathVariable String memeId,
-            @RequestParam boolean like) { // `true` for like, `false` for unlike
-        return memeService.likedMemes(username, memeId, like);
-
-    }
-
-    @PostMapping("/{memeId}/save")
-    public ResponseEntity<?> toggleSaveMeme(
-            @RequestParam String username,
-            @PathVariable String memeId,
-            @RequestParam boolean save){
-                return memeService.saveMeme(username, memeId, save);
-            }
 
     @GetMapping("/memepage/{memeId}")
     public ResponseEntity<?> getMemeById(@PathVariable String memeId) {
         return memeService.getMemeById(memeId);
     }
 
-    @GetMapping("/uploaded")
-    public ResponseEntity<Optional<Meme>> getUploadedMemes(@RequestParam String userId) {
-        return memeService.getUserUploadedMemes(userId);
+    @GetMapping("/{id}/comments")
+    public ResponseEntity<?> getMemeComments(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int limit) {
+        return memeService.getMemeComments(id, page, limit);
     }
 
-    @GetMapping("/saves")
-    public ResponseEntity<List<Meme>> getSavedMemes() {
-        return memeService.getAllMemes();
+    @GetMapping("/uploaded")
+    public ResponseEntity<List<Meme>> getUploadedMemes(@RequestParam String userId) {
+        return memeService.getUserUploadedMemes(userId);
     }
 
     // Upload a meme
@@ -86,43 +77,47 @@ public class MemeController {
     }
 
     @GetMapping("/liked/{username}")
-    public ResponseEntity<?> getLikedMemes(@PathVariable String username) {
-        return memeService.getAllLikedMemes(username);
+    public ResponseEntity<?> getLikedMemes(
+            @PathVariable String username,
+            @RequestParam(required = false, defaultValue = "false") boolean excludeComments) {
+        return memeService.getAllLikedMemes(username, excludeComments);
     }
 
     @GetMapping("saved/{username}")
-    public ResponseEntity<?> getSavedMemes(@PathVariable String username) {
-        return memeService.getAllSavedMemes(username);
+    public ResponseEntity<?> getSavedMemes(
+            @PathVariable String username,
+            @RequestParam(required = false, defaultValue = "false") boolean excludeComments) {
+        return memeService.getAllSavedMemes(username, excludeComments);
     }
 
-
-    @GetMapping("/commnets")
-    public ResponseEntity<List<Comments>> getMemeComments(@RequestParam String memeID) {
-        return memeService.getMemeComments(memeID);
-    }
+    // @GetMapping("/commnets")
+    // public ResponseEntity<List<Comments>> getMemeComments(@RequestParam String
+    // memeID) {
+    // return memeService.getMemeComments(memeID);
+    // }
 
     @PostMapping("/{memeId}/comments")
     public ResponseEntity<?> addComment(@RequestBody Comments comment, @PathVariable String memeId) {
         return memeService.addComments(comment, memeId);
     }
 
-    @GetMapping("/{memeId}/comments")
-    public ResponseEntity<List<Comments>> getCommentById(@PathVariable String memeId) {
-        return memeService.getMemeComments(memeId);
-    }
+    // @GetMapping("/{memeId}/comments")
+    // public ResponseEntity<List<Comments>> getCommentById(@PathVariable String
+    // memeId) {
+    // return memeService.getMemeComments(memeId);
+    // }
 
     @GetMapping("/search")
     public ResponseEntity<List<Meme>> searchMemes(
-            @RequestParam(required = false) String query,       // Search text
-            @RequestParam(required = false) String startDate,   // Optional start date
-            @RequestParam(required = false) String endDate,     // Optional end date
-            @RequestParam(defaultValue = "10") int limit,       // Pagination limit
-            @RequestParam(defaultValue = "0") int page,         // Pagination page number
-            @RequestParam(defaultValue = "desc") String sort    // Sort order
+            @RequestParam(required = false) String query, // Search text
+            @RequestParam(required = false) String startDate, // Optional start date
+            @RequestParam(required = false) String endDate, // Optional end date
+            @RequestParam(defaultValue = "10") int limit, // Pagination limit
+            @RequestParam(defaultValue = "0") int page, // Pagination page number
+            @RequestParam(defaultValue = "desc") String sort // Sort order
     ) {
         return memeService.searchMemes(query, startDate, endDate, limit, page, sort);
     }
-
 
     @DeleteMapping("/delete/{memeId}")
     public ResponseEntity<?> deleteMeme(@PathVariable String memeId) throws Exception {

@@ -15,4 +15,10 @@ public interface memeRepository extends MongoRepository<Meme, String>{
 
     @Query("{ 'caption': { $regex: ?0, $options: 'i' } }") // Case-insensitive regex search
     List<Meme> findByCaptionRegex(String caption);
+
+    List<Meme> findTopByOrderByLikecountDesc();
+
+    List<Meme> findByUploaderIn(List<String> uploader);
+
+    List<Meme> findByTagsIn(List<String> tags);
 }

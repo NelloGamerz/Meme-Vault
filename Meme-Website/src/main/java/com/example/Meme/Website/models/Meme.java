@@ -16,7 +16,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Meme {
-
     @Id
     private String id;
     private String UserId;
@@ -27,7 +26,9 @@ public class Meme {
     private int likecount;
     private int saveCount;
     private Date memeCreated;
+    private int commentsCount;
     @DBRef(lazy = false)
     private List<Comments> comments;
+    private List<String> tags;
     private String profilePictureUrl;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useMemeStore } from '../../store/useMemeStore.ts';
+import { useUserStore } from '../../store/useUserStore.ts';
 
 /**
  * UserProfileInitializer - A component that fetches the user profile once on app initialization
@@ -10,8 +10,8 @@ export const UserProfileInitializer: React.FC = () => {
   const isInitializedRef = useRef(false);
   
   // Get the necessary functions from the store
-  const fetchUserProfile = useMemeStore(state => state.fetchUserProfile);
-  const isLoggedInUserProfileLoaded = useMemeStore(state => state.isLoggedInUserProfileLoaded);
+  const fetchUserProfile = useUserStore.use.fetchUserProfile();
+  const isLoggedInUserProfileLoaded = useUserStore.use.isLoggedInUserProfileLoaded();
   
   // Initialize user profile only once when the app loads
   useEffect(() => {
@@ -39,7 +39,7 @@ export const UserProfileInitializer: React.FC = () => {
         if (!user || !user.username) return;
         
         // Get the profile cache from the store
-        const profileCache = useMemeStore.getState().profileCache;
+        const profileCache = useUserStore.getState().profileCache;
         const cachedProfile = profileCache[user.username];
         const isCacheValid = cachedProfile && 
                             (Date.now() - cachedProfile.timestamp < 5 * 60 * 1000);

@@ -5,9 +5,13 @@ import { useState, useEffect, useCallback } from "react"
 import { Home, Search, PlusSquare, Settings, LogOut, User, Bell } from "lucide-react"
 import { useAuth } from "../../hooks/useAuth"
 import { Button } from "../ui/Button"
-import { useMemeStore } from "../../store/useMemeStore.ts"
+import { useUserStore } from "../../store/useUserStore"
+import { useNotificationStore } from "../../store/useNotificationStore"
 import { useWebSocketStore } from "../../hooks/useWebSockets"
+// import { useWebSocketConnectionStore } from "../../store/useWebSocketConnectionStore"
 import { Notification } from "../../types/mems"
+import { getCurrentUser } from "../../utils/localStorageCache"
+import { WebSocketMessage } from "../../services/WebSocketService"
 
 interface SidebarProps {
   onNavigate: (path: string) => void
@@ -36,16 +40,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPath }) => 
   const [initialCountSet, setInitialCountSet] = useState(false)
 
   const { logout } = useAuth()
-  const fetchUserProfile = useMemeStore(state => state.fetchUserProfile);
-  const profilePictureUrl = useMemeStore(state => state.profilePictureUrl);
-  const notifications = useMemeStore(state => state.notifications);
-  const getNotifications = useMemeStore(state => state.getNotifications);
-  const { client: wsClient } = useWebSocketStore();
+  const fetchUserProfile = useUserStore.use.fetchUserProfile();
+  const profilePictureUrl = useUserStore.use.profilePictureUrl();
+  const notifications = useNotificationStore.use.notifications();
+  const getNotifications = useNotificationStore.use.getNotifications();
+  // const { client: wsClient } = useWebSocketStore();
 
-  // Get user from localStorage once on component mount
+  // Get user from cached localStorage once on component mount
   useEffect(() => {
     try {
-      const userData = JSON.parse(localStorage.getItem("user") || "{}")
+      // Use the cached version instead of directly accessing localStorage
+      const userData = getCurrentUser();
       
       // Make sure we have the profile picture from localStorage
       setUser({
@@ -55,13 +60,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPath }) => 
         profilePicture: userData.profilePicture || ""
       })
     } catch (error) {
-      console.error("Error parsing user from localStorage:", error)
+      console.error("Error getting user from cache:", error)
     }
   }, [])
 
   // Use the loggedInUserProfile from the global state instead of fetching it again
-  const loggedInUserProfile = useMemeStore(state => state.loggedInUserProfile);
-  const isLoggedInUserProfileLoaded = useMemeStore(state => state.isLoggedInUserProfileLoaded);
+  const loggedInUserProfile = useUserStore.use.loggedInUserProfile();
+  const isLoggedInUserProfileLoaded = useUserStore.use.isLoggedInUserProfileLoaded();
   
   // Only fetch the profile if it's not already loaded in the global state
   useEffect(() => {
@@ -83,83 +88,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPath }) => 
     }
   }, [getNotifications, user.username])
   
-  // Ensure WebSocket connection is established
-  useEffect(() => {
-    if (user.userId && wsClient === null) {
-      // Try to restore WebSocket connection if it's not established
-      useWebSocketStore.getState().restoreConnection();
-    }
-  }, [user.userId, wsClient]);
+  // We no longer need to explicitly restore the connection here
+  // The WebSocketManager component handles this at the application level
+  // This reduces duplicate connection checks across components
 
   // Listen for WebSocket notifications to update count in real-time without HTTP requests
   useEffect(() => {
-    const handleWebSocketMessage = (event: MessageEvent) => {
-      try {
-        const data: WebSocketNotificationData = JSON.parse(event.data)
-        
-        // Only process notifications meant for the current user
-        if ((data.recipientId === user.userId || 
-             data.recipientUsername === user.username || 
-             data.receiverUsername === user.username || 
-             data.targetUsername === user.username) && 
-            (data.type === 'FOLLOW' || data.type === 'FOLLOW_REQUEST' || 
-             data.type === 'LIKE' || data.type === 'COMMENT' || 
-             data.type === 'NOTIFICATION')) {
-          
-          console.log('New notification received via WebSocket:', data)
-          
-          // Directly increment the unread count without making an API call
-          setUnreadCount(prevCount => prevCount + 1)
-          
-          // Add the notification to the store so it's available everywhere
-          const newNotification: Partial<Notification> = {
-            id: data.id || crypto.randomUUID(),
-            type: data.type,
-            message: data.message || getNotificationMessage(data),
-            userId: data.userId || data.senderId,
-            senderUsername: data.username || data.senderUsername,
-            profilePictureUrl: data.profilePictureUrl || data.senderProfilePictureUrl,
-            createdAt: new Date(),
-            read: false,
-            isRead: false,
-            memeId: data.memeId
-          }
-          
-          // Add the notification to the store
-          useMemeStore.getState().addNotification(newNotification)
-          
-          // Dispatch a custom event to ensure all components are notified
-          const notificationEvent = new CustomEvent('new-notification', {
-            detail: { notification: newNotification }
-          });
-          window.dispatchEvent(notificationEvent);
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error)
-      }
-    }
+    // Only register handlers if we have a user ID
+    if (!user.userId) return;
     
-    // Define interface for WebSocket notification data
-    interface WebSocketNotificationData {
+    // Define a type for notification data
+    interface NotificationData {
       type: string;
-      message?: string;
       senderUsername?: string;
       username?: string;
       followerUsername?: string;
+      message?: string;
       memeId?: string;
       id?: string;
-      userId?: string;
       senderId?: string;
+      userId?: string;
       profilePictureUrl?: string;
       senderProfilePictureUrl?: string;
-      recipientId?: string;
-      recipientUsername?: string;
-      receiverUsername?: string;
-      targetUsername?: string;
     }
-
+    
     // Helper function to generate notification message based on type
-    const getNotificationMessage = (data: WebSocketNotificationData): string => {
+    const getNotificationMessage = (data: NotificationData): string => {
       switch (data.type) {
         case 'FOLLOW':
           return `${data.senderUsername || data.username || data.followerUsername} started following you`
@@ -171,16 +125,70 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPath }) => 
           return data.message || 'New notification'
       }
     }
-
-    if (wsClient && user.userId) {
-      console.log('Adding WebSocket message listener for notifications in Sidebar')
-      wsClient.addEventListener('message', handleWebSocketMessage)
-      return () => {
-        console.log('Removing WebSocket message listener for notifications in Sidebar')
-        wsClient.removeEventListener('message', handleWebSocketMessage)
+    
+    // Create a single handler for all notification types
+    const handleNotification = (data: WebSocketMessage) => {
+      // Cast the WebSocketMessage to our NotificationData type with recipient fields
+      const notificationData = data as unknown as NotificationData & {
+        recipientId?: string;
+        recipientUsername?: string;
+        receiverUsername?: string;
+        targetUsername?: string;
+      };
+      // Only process notifications meant for the current user
+      if ((notificationData.recipientId === user.userId || 
+           notificationData.recipientUsername === user.username || 
+           notificationData.receiverUsername === user.username || 
+           notificationData.targetUsername === user.username)) {
+        
+        console.log('New notification received via WebSocket:', notificationData)
+        
+        // Directly increment the unread count without making an API call
+        setUnreadCount(prevCount => prevCount + 1)
+        
+        // Add the notification to the store so it's available everywhere
+        const newNotification: Partial<Notification> = {
+          id: notificationData.id || crypto.randomUUID(),
+          type: notificationData.type,
+          message: notificationData.message || getNotificationMessage(notificationData),
+          userId: notificationData.userId || notificationData.senderId,
+          senderUsername: notificationData.username || notificationData.senderUsername,
+          profilePictureUrl: notificationData.profilePictureUrl || notificationData.senderProfilePictureUrl,
+          createdAt: new Date(),
+          read: false,
+          isRead: false,
+          memeId: notificationData.memeId
+        }
+        
+        // Add the notification to the store
+        useNotificationStore.getState().addNotification(newNotification)
+        
+        // Dispatch a custom event to ensure all components are notified
+        const notificationEvent = new CustomEvent('new-notification', {
+          detail: { notification: newNotification }
+        });
+        window.dispatchEvent(notificationEvent);
       }
+    };
+    
+    console.log('Registering WebSocket message handlers for notifications in Sidebar');
+    
+    // Register handlers for each notification type using the WebSocketService
+    // This way, we don't need to worry about reconnections or client changes
+    const unregisterHandlers = [
+      useWebSocketStore.getState().registerMessageHandler('FOLLOW', handleNotification),
+      useWebSocketStore.getState().registerMessageHandler('LIKE', handleNotification),
+      useWebSocketStore.getState().registerMessageHandler('COMMENT', handleNotification),
+      useWebSocketStore.getState().registerMessageHandler('NOTIFICATION', handleNotification)
+    ];
+    
+    // Cleanup function
+    return () => {
+      console.log('Removing WebSocket message handlers for notifications in Sidebar');
+      // Unregister all handlers
+      unregisterHandlers.forEach(unregister => unregister());
     }
-  }, [wsClient, user.userId, user.username])
+  }, [user.userId, user.username])
   
   // Set initial unread count from fetched notifications only once
   useEffect(() => {
@@ -210,7 +218,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPath }) => 
         const notification = customEvent.detail.notification;
         
         // Check if this notification is for the current user
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        const user = getCurrentUser();
         
         // For custom events, we assume the notification is already filtered for the current user
         // The userId in the notification refers to the sender, not the recipient

@@ -14,6 +14,7 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 import com.example.Meme.Website.services.JWTService;
 import com.example.Meme.Website.services.RedisService;
 import com.example.Meme.Website.services.UserDetailsServiceImpl;
+import com.example.Meme.Website.models.UserPrincipal;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -56,11 +57,13 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
 
         boolean accessTokenValid = false;
         UserDetails userDetails = null;
+        String userId = null;
 
         if (accessToken != null) {
             try {
                 username = jwtService.extractUsernameEvenIfExpired(accessToken);
                 userDetails = userDetailsServiceImpl.loadUserByUsername(username);
+                userId = ((UserPrincipal) userDetails).getUserId();
 
                 accessTokenValid = jwtService.validateToken(accessToken, userDetails);
             } catch (Exception e) {
@@ -77,6 +80,9 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
             }
 
             attributes.put("username", username);
+            if (userDetails != null) {
+                attributes.put("userId", userId);
+            }
             return true;
         }
 
@@ -87,8 +93,14 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
 
                 if (refreshToken != null && jwtService.validateToken(refreshToken, userDetails)) {
                     String newAccessToken = jwtService.generateToken(username, 15, "access_token");
+                    
+                    if (userDetails instanceof UserPrincipal) {
+                        userId = ((UserPrincipal) userDetails).getUserId();
+                    }
+                    
                     attributes.put("access_token", newAccessToken);
                     attributes.put("username", username);
+                    attributes.put("userId", userId);
 
                     if (jwtService.willExpireSoon(refreshToken, 60 * 24)) {
                         String newRefreshToken = jwtService.generateToken(username, 60 * 24 * 7, "refresh_token");

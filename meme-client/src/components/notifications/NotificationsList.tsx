@@ -3,24 +3,26 @@ import { User, Heart, MessageCircle, ArrowLeft, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useWebSocketStore } from '../../hooks/useWebSockets';
 import { cn } from '../../hooks/utils';
-import { useMemeStore } from '../../store/useMemeStore.ts';
+import { useNotificationStore } from '../../store/useNotificationStore';
+import { useUserStore } from '../../store/useUserStore';
 import api from '../../hooks/api';
 import { Notification } from '../../types/mems';
+import { getCurrentUser } from '../../utils/localStorageCache';
 
 export const NotificationsList: React.FC = () => {
   const navigate = useNavigate();
-  const { client: wsClient } = useWebSocketStore();
+  // const { client: wsClient } = useWebSocketStore();
   // Use a more selective approach to get only what we need from the store
-  const notifications = useMemeStore(state => state.notifications);
-  const isLoading = useMemeStore(state => state.isLoading);
-  const error = useMemeStore(state => state.error);
-  const getNotifications = useMemeStore(state => state.getNotifications);
-  const addNotification = useMemeStore(state => state.addNotification);
-  const userName = useMemeStore(state => state.userName);
+  const notifications = useNotificationStore.use.notifications();
+  const isLoading = useNotificationStore.use.isLoading();
+  const error = useNotificationStore.use.error();
+  const getNotifications = useNotificationStore.use.getNotifications();
+  const addNotification = useNotificationStore.use.addNotification();
+  const userName = useUserStore.use.userName();
 
   // Fetch notifications when component mounts
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = getCurrentUser();
     if (user.username) {
       console.log('NotificationsList: Fetching notifications for user:', user.username);
       getNotifications(user.username);
@@ -47,7 +49,7 @@ export const NotificationsList: React.FC = () => {
             );
             
             // Update the store with all notifications marked as read
-            useMemeStore.setState({ notifications: updatedNotifications });
+            useNotificationStore.setState({ notifications: updatedNotifications });
             
             // Dispatch a custom event to notify other components that notifications were read
             try {
@@ -68,48 +70,9 @@ export const NotificationsList: React.FC = () => {
     markUnreadNotificationsAsRead();
   }, [notifications, userName]);
 
-  // Setup WebSocket message handler for real-time notifications
+  // Setup WebSocket message handler for real-time notifications using the centralized handler system
   useEffect(() => {
-    console.log('NotificationsList: Setting up WebSocket handler');
-    
-    const handleWebSocketMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data) as WebSocketNotificationData;
-        console.log('NotificationsList: WebSocket message received:', data);
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        
-        // Handle notification types for real-time updates
-        if (data.type && user.username) {
-          // Check if this notification is for the current user
-          const isForCurrentUser = 
-            (data.receiverUsername === user.username) || 
-            (data.targetUsername === user.username);
-            
-          if (isForCurrentUser) {
-            console.log('NotificationsList: Adding real-time notification');
-            
-            // Create a notification object from the WebSocket data
-            const newNotification: Partial<Notification> = {
-              id: data.id || crypto.randomUUID(),
-              type: data.type,
-              message: data.message || getNotificationMessage(data),
-              userId: data.userId || data.senderId,
-              senderUsername: data.username || data.senderUsername,
-              profilePictureUrl: data.profilePictureUrl || data.senderProfilePictureUrl,
-              createdAt: new Date(),
-              read: false,
-              isRead: false,
-              memeId: data.memeId
-            };
-            
-            // Add the notification to the store
-            addNotification(newNotification);
-          }
-        }
-      } catch (error) {
-        console.error('NotificationsList: Error handling WebSocket message:', error);
-      }
-    };
+    console.log('NotificationsList: Setting up WebSocket handlers');
     
     // Define interface for WebSocket notification data
     interface WebSocketNotificationData {
@@ -125,6 +88,8 @@ export const NotificationsList: React.FC = () => {
       memeId?: string;
       receiverUsername?: string;
       targetUsername?: string;
+      recipientUsername?: string;
+      recipientId?: string;
     }
 
     // Helper function to generate notification message based on type
@@ -140,18 +105,61 @@ export const NotificationsList: React.FC = () => {
           return data.message || 'New notification';
       }
     };
+    
+    // Create a handler for notification messages
+    const handleNotification = (data: WebSocketNotificationData) => {
+      console.log('NotificationsList: WebSocket notification received:', data);
+      const user = getCurrentUser();
+      
+      // Check if this notification is for the current user
+      const isForCurrentUser = 
+        (data.receiverUsername === user.username) || 
+        (data.targetUsername === user.username) ||
+        (data.recipientUsername === user.username) ||
+        (data.recipientId === user.userId);
+          
+      if (isForCurrentUser && user.username) {
+        console.log('NotificationsList: Adding real-time notification');
+        
+        // Create a notification object from the WebSocket data
+        const newNotification: Partial<Notification> = {
+          id: data.id || crypto.randomUUID(),
+          type: data.type,
+          message: data.message || getNotificationMessage(data),
+          userId: data.userId || data.senderId,
+          senderUsername: data.username || data.senderUsername,
+          profilePictureUrl: data.profilePictureUrl || data.senderProfilePictureUrl,
+          createdAt: new Date(),
+          read: false,
+          isRead: false,
+          memeId: data.memeId
+        };
+        
+        // Add the notification to the store
+        addNotification(newNotification);
+      }
+    };
 
-    if (wsClient) {
-      console.log('NotificationsList: Adding WebSocket event listener');
-      wsClient.addEventListener('message', handleWebSocketMessage);
+    // Get the current user
+    const user = getCurrentUser();
+    
+    if (user.username) {
+      // Register handlers for each notification type using the WebSocketService
+      const unregisterHandlers = [
+        useWebSocketStore.getState().registerMessageHandler('FOLLOW', handleNotification),
+        useWebSocketStore.getState().registerMessageHandler('LIKE', handleNotification),
+        useWebSocketStore.getState().registerMessageHandler('COMMENT', handleNotification),
+        useWebSocketStore.getState().registerMessageHandler('NOTIFICATION', handleNotification)
+      ];
+      
+      // Cleanup function
       return () => {
-        console.log('NotificationsList: Removing WebSocket event listener');
-        wsClient.removeEventListener('message', handleWebSocketMessage);
+        console.log('NotificationsList: Removing WebSocket message handlers');
+        // Unregister all handlers
+        unregisterHandlers.forEach(unregister => unregister());
       };
-    } else {
-      console.warn('NotificationsList: No WebSocket client available');
     }
-  }, [wsClient, addNotification]);
+  }, [addNotification]);
 
   const handleNotificationClick = (notification: Notification) => {
     try {
@@ -161,7 +169,7 @@ export const NotificationsList: React.FC = () => {
       );
       
       // Update the store with the updated notifications
-      useMemeStore.setState({ notifications: updatedNotifications });
+      useNotificationStore.setState({ notifications: updatedNotifications });
       
       // Navigate based on notification type
       switch (notification.type) {
@@ -187,7 +195,7 @@ export const NotificationsList: React.FC = () => {
   // Keeping this function in case it's needed elsewhere in the future
   // const markAllAsRead = async () => {
   //   try {
-  //     const user = JSON.parse(localStorage.getItem('user') || '{}');
+  //     const user = getCurrentUser();
   //     if (!user.username) return;
       
   //     // Update UI immediately
@@ -198,7 +206,7 @@ export const NotificationsList: React.FC = () => {
   //     }));
       
   //     // Update the store with all notifications marked as read
-  //     useMemeStore.setState({ notifications: updatedNotifications });
+  //     useNotificationStore.setState({ notifications: updatedNotifications });
       
   //     // Then send the update to the server
   //     await api.post(`/notifications/${user.username}/mark-all-read`);
@@ -270,7 +278,12 @@ export const NotificationsList: React.FC = () => {
           ) : (
             // Sort notifications by date (newest first) before rendering
             [...notifications]
-              .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+              .sort((a, b) => {
+                // Ensure createdAt is a valid Date object
+                const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt || 0);
+                const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt || 0);
+                return dateB.getTime() - dateA.getTime();
+              })
               .map(notification => (
               <div
                 key={notification.id}
@@ -289,7 +302,7 @@ export const NotificationsList: React.FC = () => {
                       const updatedNotifications = notifications.map(n => 
                         n.id === notification.id ? { ...n, read: true, isRead: true } : n
                       );
-                      useMemeStore.setState({ notifications: updatedNotifications });
+                      useNotificationStore.setState({ notifications: updatedNotifications });
                       
                       // Always navigate to user profile when clicking on profile picture
                       navigate(`/profile/${notification.senderUsername}`);
@@ -343,8 +356,8 @@ export const NotificationsList: React.FC = () => {
 // NotificationPanel component for displaying notification count and navigating to notifications page
 export const NotificationPanel: React.FC = () => {
   const navigate = useNavigate();
-  const userName = useMemeStore(state => state.userName);
-  const notifications = useMemeStore(state => state.notifications);
+  const userName = useUserStore.use.userName();
+  const notifications = useNotificationStore.use.notifications();
 
   const handleClick = async () => {
     if (userName) {
@@ -364,7 +377,7 @@ export const NotificationPanel: React.FC = () => {
           );
           
           // Update the store with all notifications marked as read
-          useMemeStore.setState({ notifications: updatedNotifications });
+          useNotificationStore.setState({ notifications: updatedNotifications });
           
           // Dispatch a custom event to notify other components that notifications were read
           try {

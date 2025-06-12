@@ -3,7 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthPage } from './pages/AuthPage';
 import { MainPage } from './pages/MainPage';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { ProfilePage } from './components/mainPage/ProfilePage';
+import { ProfilePage } from './pages/ProfilePage';
 import MemeDetailPage from './pages/MemeDetailPage';
 import { ForgotPasswordForm } from './pages/ForgotPasswordForm';
 import PasswordResetPage from './pages/password-reset';

@@ -3,6 +3,7 @@ package com.example.Meme.Website.services;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -96,6 +97,8 @@ public class AuthService {
             user.setMemeList(new ArrayList<>());
             user.setSavedMemes(new ArrayList<>());
             user.setLikedMemes(new ArrayList<>());
+            user.setSeenMemes(new ArrayList<>());
+            user.setTagInteractions(new HashMap<>());
             user.setProfilePictureUrl("");
             user.setFollowersCount(0L);
             user.setFollowingCount(0L);

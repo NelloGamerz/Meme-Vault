@@ -3,6 +3,7 @@ package com.example.Meme.Website.WebSockets;
 import java.io.IOException;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
 
 import com.example.Meme.Website.models.Comments;
-import com.example.Meme.Website.services.NotificationService;
+import com.example.Meme.Website.models.Meme;
 import com.example.Meme.Website.services.ProfileService;
 import com.example.Meme.Website.services.memeService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,10 +23,13 @@ public class CustomWebSocketHandler implements WebSocketHandler {
 
     private final memeService memeService;
     private final ProfileService profileService;
+    private final WebSocketSessionManager webSocketSessionManager;
 
-    public CustomWebSocketHandler(memeService memeService, ProfileService profileService) {
+    public CustomWebSocketHandler(memeService memeService, ProfileService profileService,
+            WebSocketSessionManager webSocketSessionManager) {
         this.memeService = memeService;
         this.profileService = profileService;
+        this.webSocketSessionManager = webSocketSessionManager;
     }
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -54,11 +58,11 @@ public class CustomWebSocketHandler implements WebSocketHandler {
 
         switch (type) {
             case "JOIN_POST":
-                WebSocketSessionManager.registerPostSession(json.get("postId").asText(), session);
+                webSocketSessionManager.registerPostSession(json.get("postId").asText(), session);
                 break;
 
             case "LEAVE_POST":
-                WebSocketSessionManager.removePostSession(json.get("postId").asText(), session);
+                webSocketSessionManager.removePostSession(json.get("postId").asText(), session);
                 break;
 
             case "LIKE":
@@ -72,9 +76,9 @@ public class CustomWebSocketHandler implements WebSocketHandler {
             case "COMMENT":
                 Comments comment = new Comments();
                 comment.setMemeId(json.get("memeId").asText());
-                String userId = json.has("userId") ? json.get("userId").asText()
+                String commentUserId = json.has("userId") ? json.get("userId").asText()
                         : (String) session.getAttributes().get("userId");
-                comment.setUserId(userId);
+                comment.setUserId(commentUserId);
                 comment.setUsername(username);
                 comment.setText(json.get("text").asText());
                 comment.setCreatedAt(new Date());
@@ -84,20 +88,8 @@ public class CustomWebSocketHandler implements WebSocketHandler {
                 memeService.addCommentsToMeme(comment);
                 break;
 
-            // case "FOLLOW":
-            // System.out.println("Incoming message: " + json.toPrettyString());
-
-            // String followedUsername = json.get("followingUsername").asText();
-            // // profileService.followUser(username, followedUsername);
-            // boolean isFollowing = json.has("isFollowing") &&
-            // json.get("isFollowing").asBoolean();
-            // Map<String, Boolean> requestBody = new HashMap<>();
-            // requestBody.put("isFollowing", isFollowing);
-
-            // profileService.followUserByUsername(username, followedUsername, requestBody);
-
             case "FOLLOW":
-            System.out.println("Incoming message: " + json.toPrettyString());
+                System.out.println("Incoming message: " + json.toPrettyString());
                 String followerUsername = json.get("followerUsername").asText();
                 String followingUsername = json.get("followingUsername").asText(); // Not "followedUsername"!
 
@@ -107,6 +99,25 @@ public class CustomWebSocketHandler implements WebSocketHandler {
 
                 profileService.followUserByUsername(followerUsername, followingUsername, requestBody);
                 break;
+
+            case "GET_MEMES":
+                try {
+                    String userId = json.has("userId") ? json.get("userId").asText()
+                            : (String) session.getAttributes().get("userId");
+                    boolean excludeComments = json.get("excludeComments").asBoolean();
+
+                    List<Meme> memes = memeService.getUserFeed(userId, excludeComments).getBody(); // Assuming non-null body
+
+                    ObjectMapper mapper = new ObjectMapper();
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("type", "MEMES_RESPONSE");
+                    response.put("memes", memes);
+
+                    String responseJson = mapper.writeValueAsString(response);
+                    session.sendMessage(new TextMessage(responseJson));
+                } catch (Exception e) {
+                    session.sendMessage(new TextMessage("{\"error\":\"Failed to fetch feed\"}"));
+                }
 
             default:
                 session.sendMessage(new TextMessage("{\"error\":\"Unknown type: " + type + "\"}"));

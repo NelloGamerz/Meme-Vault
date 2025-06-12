@@ -26,9 +26,13 @@ interface WebSocketStore {
   restoreConnection: () => void;
   sendMessage: (message: WebSocketMessage) => boolean;
   registerMessageHandler: (type: WebSocketMessageType, handler: MessageHandler) => () => void;
-  sendFollowRequest: (targetUserId: string, isFollowing: boolean) => boolean;
+  registerApplicationActive: () => () => void; // Add method to register app as active
+  sendFollowRequest: (targetUserId: string, targetUsername: string, isFollowing: boolean) => boolean;
   sendJoinPostRequest: (postId: string) => boolean;
   sendLeavePostRequest: (postId: string) => boolean;
+  sendLikeRequest: (memeId: string) => Promise<boolean>;
+  sendSaveRequest: (memeId: string) => Promise<boolean>;
+  sendCommentRequest: (memeId: string, text: string, profilePictureUrl: string) => boolean;
 }
 
 // Create the store
@@ -61,8 +65,12 @@ export const useWebSocketStore = create<WebSocketStore>((set) => ({
     return WebSocketService.registerMessageHandler(type, handler);
   },
   
-  sendFollowRequest: (targetUserId: string, isFollowing: boolean) => {
-    return WebSocketService.sendFollowRequest(targetUserId, isFollowing);
+  registerApplicationActive: () => {
+    return WebSocketService.registerApplicationActive();
+  },
+  
+  sendFollowRequest: (targetUserId: string, targetUsername: string, isFollowing: boolean) => {
+    return WebSocketService.sendFollowRequest(targetUserId, targetUsername, isFollowing);
   },
   
   sendJoinPostRequest: (postId: string) => {
@@ -71,6 +79,18 @@ export const useWebSocketStore = create<WebSocketStore>((set) => ({
   
   sendLeavePostRequest: (postId: string) => {
     return WebSocketService.sendLeavePostRequest(postId);
+  },
+  
+  sendLikeRequest: (memeId: string) => {
+    return WebSocketService.sendLikeRequest(memeId);
+  },
+  
+  sendSaveRequest: (memeId: string) => {
+    return WebSocketService.sendSaveRequest(memeId);
+  },
+  
+  sendCommentRequest: (memeId: string, text: string, profilePictureUrl: string) => {
+    return WebSocketService.sendCommentRequest(memeId, text, profilePictureUrl);
   }
 }));
 
